@@ -18,7 +18,8 @@ const estadisticasRoutes = require('./routes/estadisticas');
 const balanceRoutes = require('./routes/balance');
 const comprasRoutes = require('./routes/compras');
 const usuariosRoutes = require('./routes/usuarios');
-
+const iaRoutes = require('./routes/ia');
+const { initScheduler } = require('./ai_modules/scheduler');
 
 const app = express();
 const port = 3001;
@@ -75,6 +76,16 @@ app.use('/api/estadisticas', estadisticasRoutes);
 app.use('/api/balance', balanceRoutes);
 app.use('/api/compras', comprasRoutes);
 app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/ia', iaRoutes);
+
+const PORT = process.env.PORT || 4000;
+
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+    
+    // 3. INICIAR CRON JOB
+    initScheduler();
+});
 
 
 // Ruta de login

@@ -25,6 +25,7 @@ import Statistics from './components/Statistics';
 import Balance from './components/Balance';
 import Login from './components/Login';
 import ListaUsuarios from './components/ListaUsuarios';
+import IAWidget from './components/IAWidget';
 
 // Importar el archivo CSS
 import './styles.css';
@@ -177,8 +178,10 @@ function App() {
 
                     </Routes>
                 </div>
+                <IAWidget />
             </div>
         </Router>
+        
     );
 }
 

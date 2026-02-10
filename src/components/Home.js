@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PendingItemEditModal from './PendingItemEditModal'; // NUEVO: Importar el componente modal
 import { format } from 'date-fns'; // Import the format function from date-fns
-
+import IAPanel from './IAPanel';
 
 const electronAPI = window.electronAPI; // Acceder a la API expuesta globalmente
 
@@ -371,6 +371,20 @@ function Home() {
                  />
             )}
 
+
+        </div>
+    );
+return (
+        <div className="home-container" style={{ padding: '20px' }}>
+            <h1>Panel de Control</h1>
+            
+            {/* INICIO INTEGRACIÓN IA */}
+            <div className="row">
+                <div className="col-12">
+                    <IAPanel />
+                </div>
+            </div>
+            {/* FIN INTEGRACIÓN IA */}
 
         </div>
     );
