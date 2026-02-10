@@ -21,7 +21,10 @@ const balanceRoutes = require('./routes/balance');
 const comprasRoutes = require('./routes/compras');
 const usuariosRoutes = require('./routes/usuarios');
 const iaRoutes = require('./routes/ia');
+
 const { initScheduler } = require('./ai_modules/scheduler');
+// --- NUEVO: Importamos el servicio de WhatsApp ---
+const { iniciarWhatsApp } = require('./ai_modules/whatsappService');
 
 const app = express();
 const PORT = 3001;
@@ -103,5 +106,8 @@ app.use('/api/usuarios', usuariosRoutes);
 // Inicia el servidor
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Servidor corriendo en puerto ${PORT}`);
-    initScheduler(); // Inicia el cron de la IA
+    
+    // Inicia servicios en segundo plano
+    initScheduler(); // El cron de la IA
+    iniciarWhatsApp(); // --- NUEVO: Arranca el bot de WhatsApp ---
 });

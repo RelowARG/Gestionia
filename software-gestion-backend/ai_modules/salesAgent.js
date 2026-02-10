@@ -5,19 +5,35 @@ const { pool } = require('../db');
 function limpiarTelefono(telefono) {
     if (!telefono) return null;
     let num = telefono.toString().replace(/\D/g, '');
-    if (num.length === 10) return '549' + num;
+    
+    // Lógica Argentina
+    if (num.startsWith('549')) return num; 
+    if ((num.startsWith('11') || num.startsWith('2') || num.startsWith('3')) && num.length === 10) {
+        return '549' + num;
+    }
     return num;
 }
 
-function limpiarJSON(texto) {
-    return texto.replace(/```json/g, '').replace(/```/g, '').trim();
+// --- FUNCIÓN DE LIMPIEZA BLINDADA ---
+// Busca el primer corchete '[' y el último ']' para extraer SOLO el JSON válido.
+function extraerJSON(texto) {
+    try {
+        const inicio = texto.indexOf('[');
+        const fin = texto.lastIndexOf(']');
+        if (inicio === -1 || fin === -1) return []; // Si no hay array, devuelve vacío
+        
+        const jsonLimpio = texto.substring(inicio, fin + 1);
+        return JSON.parse(jsonLimpio);
+    } catch (e) {
+        console.error("Error parseando JSON de IA:", e);
+        return [];
+    }
 }
 
 // --- 1. CONTEXTO GENERAL ---
 async function getBusinessContext() {
     try {
         const db = pool.promise();
-        
         const [ventasHoy] = await db.query(`SELECT COUNT(*) as cantidad, COALESCE(SUM(Total), 0) as dinero FROM ventas WHERE DATE(Fecha) = CURDATE()`);
         const [stockBajo] = await db.query(`SELECT p.Descripcion, s.Cantidad FROM stock s JOIN productos p ON s.Producto_id = p.id WHERE s.Cantidad <= 5 LIMIT 5`);
         const [deudas] = await db.query(`SELECT c.Empresa, SUM(v.Total) as deuda FROM ventas v JOIN clientes c ON v.Cliente_id = c.id WHERE v.Pago IN ('Pendiente', 'Parcial', 'Debe') GROUP BY c.id ORDER BY deuda DESC LIMIT 3`);
@@ -27,28 +43,53 @@ async function getBusinessContext() {
 
         return `
             REPORTE LABELTECH:
-            - Ventas Hoy: ${ventasHoy[0].cantidad} ($${ventasHoy[0].dinero})
+            - Ventas Hoy: ${ventasHoy[0].cantidad} ($${ventasHoy[0].dinero}).
             - Stock Crítico: \n${fmtStock}
-            - Deudas: \n${fmtDeudas}
+            - Mayores Deudores: \n${fmtDeudas}
         `;
     } catch (e) { return "Error DB"; }
 }
 
+// --- 2. CHAT ---
 async function chatWithData(userQuestion) {
     try {
         const context = await getBusinessContext();
-        const prompt = `Eres el Gerente Comercial de Labeltech. DATOS: ${context}. USUARIO: "${userQuestion}". Responde brevemente con formato rico (**negritas**).`;
+        const prompt = `
+            Eres el Gerente Comercial de Labeltech. 
+            DATOS: ${context}. 
+            USUARIO: "${userQuestion}". 
+            INSTRUCCIONES: Responde breve y usa **negritas**.
+        `;
         const result = await model.generateContent(prompt);
         return (await result.response).text();
-    } catch (e) { return "IA procesando..."; }
+    } catch (e) { return "Procesando..."; }
 }
 
-// --- 2. GENERADOR DE TAREAS PROACTIVO ---
+// --- 3. GENERADOR DE TAREAS ---
 async function getOpenTasks() {
     try {
         const db = pool.promise();
 
-        // A. CLIENTES INACTIVOS
+        // A. NUEVOS MENSAJES (Prioridad Máxima)
+        const [mensajes] = await db.query(`
+            SELECT h.Cliente_id, c.Empresa, c.Telefono, h.Mensaje, h.Fecha
+            FROM historial_conversaciones h
+            JOIN clientes c ON h.Cliente_id = c.id
+            WHERE h.Emisor = 'cliente' 
+            AND h.Fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            ORDER BY h.Fecha DESC LIMIT 3
+        `);
+
+        const tareasMensajes = mensajes.map(m => ({
+            id: `msg_${m.Cliente_id}_${m.Fecha.getTime()}`, 
+            tipo: 'mensaje', 
+            titulo: `💬 Mensaje de ${m.Empresa}`,
+            subtitulo: `Recibido hace poco.`,
+            telefono: limpiarTelefono(m.Telefono),
+            mensaje: `Hola ${m.Empresa}, vi tu mensaje: "${m.Mensaje}". ¿En qué te ayudo?`
+        }));
+
+        // B. RECUPERO (Inactivos > 30 días)
         const [clientes] = await db.query(`
             SELECT c.id, c.Empresa, c.Contacto, c.Telefono, MAX(v.Fecha) as ultima_compra, SUM(v.Total) as total_gastado
             FROM clientes c JOIN ventas v ON c.id = v.Cliente_id
@@ -57,62 +98,76 @@ async function getOpenTasks() {
             ORDER BY total_gastado DESC LIMIT 5
         `);
 
-        // B. PREPARAMOS DATOS
+        // Preparar datos para que la IA redacte
         const datosParaIA = await Promise.all(clientes.map(async (c) => {
+            const dias = Math.floor((new Date() - new Date(c.ultima_compra)) / (1000 * 60 * 60 * 24));
+            
+            // Productos favoritos
             const [prods] = await db.query(`
                 SELECT p.Descripcion FROM venta_items vi JOIN ventas v ON vi.Venta_id = v.id JOIN productos p ON vi.Producto_id = p.id
                 WHERE v.Cliente_id = ? GROUP BY p.id ORDER BY SUM(vi.Cantidad) DESC LIMIT 2
             `, [c.id]);
             
+            // Historial de chat
+            const [chats] = await db.query(`SELECT Mensaje FROM historial_conversaciones WHERE Cliente_id = ? AND Emisor='cliente' ORDER BY Fecha DESC LIMIT 1`, [c.id]);
+            const ultimoChat = chats.length > 0 ? chats[0].Mensaje : "Sin mensajes previos";
+
             return {
                 empresa: c.Empresa,
                 contacto: c.Contacto || "Encargado",
-                dias_inactivo: Math.floor((new Date() - new Date(c.ultima_compra)) / (1000 * 60 * 60 * 24)),
-                productos_top: prods.map(p => p.Descripcion).join(', ') || "insumos"
+                dias_inactivo: dias,
+                productos: prods.map(p => p.Descripcion).join(', ') || "insumos de etiquetas",
+                ultimo_chat: ultimoChat
             };
         }));
 
-        // C. PROMPT CORREGIDO CON EL NOMBRE "LABELTECH"
-        const promptBatch = `
-            Actúa como un experto en Ventas B2B de la empresa "Labeltech".
-            
-            TAREA:
-            Genera 5 mensajes de WhatsApp distintos para recuperar a estos clientes inactivos.
-            
-            REGLAS DE ORO:
-            1. Preséntate siempre como "Julian de Labeltech" de forma natural.
-            2. Menciona los productos que solían comprar (${JSON.stringify(datosParaIA[0].productos_top)}...) para recordarles la calidad.
-            3. Tono cercano, profesional y breve.
-            4. Devuelve SOLO un Array JSON de Strings.
-            
-            CLIENTES A CONTACTAR:
-            ${JSON.stringify(datosParaIA)}
-        `;
-
+        // PROMPT REFORZADO PARA JSON ESTRICTO
         let mensajesGenerados = [];
-        try {
-            const result = await model.generateContent(promptBatch);
-            const textoLimpio = limpiarJSON(await result.response.text());
-            mensajesGenerados = JSON.parse(textoLimpio);
-        } catch (error) {
-            // Fallback con nombre fijo
-            mensajesGenerados = datosParaIA.map(d => `Hola ${d.contacto}, te escribo de Labeltech. Hace mucho no hablamos, ¿necesitas ${d.productos_top}?`);
+        if (datosParaIA.length > 0) {
+            const promptBatch = `
+                Actúa como experto en ventas B2B de Labeltech.
+                Genera ${datosParaIA.length} mensajes de WhatsApp distintos para recuperar clientes.
+                
+                CLIENTES:
+                ${JSON.stringify(datosParaIA)}
+
+                REGLAS OBLIGATORIAS:
+                1. Devuelve ÚNICAMENTE un Array JSON de strings. Ejemplo: ["Hola Juan...", "Buenas tardes..."].
+                2. NO agregues texto antes ni después del JSON (ni "aquí tienes", ni comillas invertidas).
+                3. Usa el campo "ultimo_chat" para personalizar si hay algo relevante.
+                4. Menciona sus "productos" favoritos para generar deseo.
+                5. Sé breve y amigable.
+            `;
+
+            try {
+                const result = await model.generateContent(promptBatch);
+                const textoIA = await result.response.text();
+                // Usamos la nueva función blindada
+                mensajesGenerados = extraerJSON(textoIA);
+            } catch (error) {
+                console.error("Fallo IA Generando mensajes:", error);
+            }
         }
 
-        // D. UNIMOS TODO
-        const tareasClientes = clientes.map((c, index) => {
+        // Unimos los mensajes generados con los clientes
+        const tareasRecupero = clientes.map((c, index) => {
             const dias = Math.floor((new Date() - new Date(c.ultima_compra)) / (1000 * 60 * 60 * 24));
+            // Si la IA generó mensaje, úsalo. Si no, usa el fallback pero con productos.
+            const mensajeFinal = mensajesGenerados[index] 
+                ? mensajesGenerados[index] 
+                : `Hola ${c.Empresa}, te escribo de Labeltech. Hace ${dias} días no hacemos pedido. ¿Necesitas reponer stock?`;
+
             return {
                 id: `recu_${c.id}`,
                 tipo: 'recupero',
                 titulo: `Recuperar a ${c.Empresa}`,
-                subtitulo: `Inactivo hace ${dias} días.`,
+                subtitulo: `Inactivo ${dias} días.`,
                 telefono: limpiarTelefono(c.Telefono),
-                mensaje: mensajesGenerados[index] || `Hola ${c.Empresa}, somos Labeltech. ¿Necesitan reposición?` 
+                mensaje: mensajeFinal
             };
         });
 
-        // E. DEUDAS (Con nombre Labeltech fijo)
+        // C. DEUDAS
         const [deudas] = await db.query(`
             SELECT c.id, c.Empresa, c.Telefono, SUM(v.Total) as deuda FROM ventas v JOIN clientes c ON v.Cliente_id = c.id
             WHERE v.Pago IN ('Pendiente', 'Parcial', 'Debe') GROUP BY c.id ORDER BY deuda DESC LIMIT 5
@@ -122,13 +177,12 @@ async function getOpenTasks() {
             id: `cobro_${c.id}`,
             tipo: 'cobranza',
             titulo: `Cobrar a ${c.Empresa}`,
-            subtitulo: `Saldo pendiente: $${c.deuda}`,
+            subtitulo: `Deuda: $${c.deuda}`,
             telefono: limpiarTelefono(c.Telefono),
-            // AQUÍ AGREGAMOS "LABELTECH" FIJO
-            mensaje: `Hola ${c.Empresa}, te escribo de Labeltech para ver el saldo pendiente de $${c.deuda}. ¿Me confirmas fecha estimada? Gracias.`
+            mensaje: `Hola ${c.Empresa}, te escribo de Labeltech por el saldo pendiente de $${c.deuda}. ¿Podemos coordinar? Gracias.`
         }));
 
-        return [...tareasDeuda, ...tareasClientes];
+        return [...tareasMensajes, ...tareasDeuda, ...tareasRecupero];
 
     } catch (error) {
         console.error("Error tasks:", error);

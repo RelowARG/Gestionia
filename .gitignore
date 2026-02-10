@@ -1,3 +1,5 @@
 node_modules
 public/images/desktop.ini
 public/desktop.ini
+.wwebjs_auth
+.wwebjs_cache
