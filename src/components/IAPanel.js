@@ -7,7 +7,7 @@ const IAPanel = () => {
     const [loadingChat, setLoadingChat] = useState(false);
 
     // Ajusta si tu puerto de backend es diferente
-    const API_URL = 'http://localhost:4000/api/ia';
+    const API_URL = 'http://localhost:3001/api/ia';
 
     useEffect(() => {
         fetchInsights();

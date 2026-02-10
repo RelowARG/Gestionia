@@ -1,10 +1,14 @@
+// software-gestion-backend/ai_modules/core.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-// Inicializar Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) console.error("❌ ERROR: Falta API KEY en .env");
 
-// Usamos el modelo flash por ser rápido y económico, o pro si prefieres más razonamiento
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const genAI = new GoogleGenerativeAI(apiKey);
+
+// Usamos 1.5-flash que es más rápido y tiene mejor capa gratuita
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 module.exports = { model };
