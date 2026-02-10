@@ -1,0 +1,42 @@
+{
+  "name": "software-gestion",
+  "version": "1.0.0",
+  "description": "Aplicación de gestión",
+  "main": "main.js",
+  "scripts": {
+    "start": "npm run webpack && electron-forge start",
+    "webpack": "webpack --mode development",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "keywords": [],
+  "author": "Tu Nombre",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.26.10",
+    "@babel/preset-env": "^7.26.9",
+    "@babel/preset-react": "^7.26.3",
+    "@electron-forge/cli": "^7.2.0",
+    "@electron-forge/maker-deb": "^7.2.0",
+    "@electron-forge/maker-rpm": "^7.2.0",
+    "@electron-forge/maker-squirrel": "^7.2.0",
+    "@electron-forge/maker-zip": "^7.2.0",
+    "@electron-forge/plugin-fuses": "^7.8.0",
+    "@electron-forge/plugin-webpack": "^7.2.0",
+    "babel-loader": "^10.0.0",
+    "css-loader": "^6.11.0",
+    "electron": "^29.0.1",
+    "style-loader": "^3.3.4",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "date-fns": "^4.1.0",
+    "react": "^18.2.0",
+    "react-datepicker": "^8.3.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.5.3",
+    "sqlite3": "^5.1.7"
+  }
+}

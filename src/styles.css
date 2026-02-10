@@ -1,0 +1,803 @@
+/* src/styles.css - Material UI Dark Theme for Screen, Material UI Light Theme for Print */
+
+/* Import a Material Icons font if you plan to use icons */
+/* @import url('https://fonts.googleapis.com/icon?family=Material+Icons'); */
+
+/* Basic Reset and Roboto Font */
+/* Ajustado para un tema oscuro */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: 'Roboto', sans-serif; /* Usar Roboto o tu fuente preferida */
+    background-color: #121212; /* Fondo oscuro principal (ej: Negro Material UI 900) */
+    color: #e0e0e0; /* Color de texto claro por defecto (ej: Blanco 87%) */
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Para evitar scroll indeseado */
+    box-sizing: border-box;
+}
+
+/* Navbar (App Bar) */
+.navbar {
+    background-color: #212121; /* Fondo más oscuro para la barra superior (ej: Negro Material UI 800) */
+    color: #ffffff; /* Texto blanco en la barra */
+    padding: 0 24px; /* Espaciado horizontal */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Sombra para elevar la barra */
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0; /* Evita que la navbar se encoja */
+    min-height: 64px; /* Altura estándar de app bar */
+    display: flex;
+    align-items: center; /* Centrar verticalmente los ítems */
+}
+
+.nav-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex; /* Alinear ítems horizontalmente */
+    align-items: center;
+    flex-wrap: wrap; /* Permite que los ítems se envuelvan en pantallas pequeñas */
+}
+
+.nav-item {
+    margin-right: 32px; /* Espacio entre ítems del menú */
+    position: relative; /* Needed for absolute positioning of dropdown */
+}
+
+.nav-item:last-child {
+    margin-right: 0; /* Eliminar margen derecho del último ítem */
+}
+
+/* Style for the link text within nav items */
+.nav-item a {
+    text-decoration: none;
+    color: #ffffff; /* Color del enlace (blanco) */
+    font-size: 1rem;
+    font-weight: 500; /* Peso de la fuente */
+    display: block; /* For padding */
+    padding: 12px 0; /* Vertical padding */
+    transition: color 0.3s ease; /* Smooth transition on hover */
+}
+
+.nav-item a:hover {
+    color: #bbdefb; /* Color on hover (e.g., Light Blue 100) */
+}
+
+/* Style for the text of dropdown parents (if not a link) */
+.nav-item.has-dropdown {
+    color: #ffffff; /* Text color */
+    padding: 12px 0; /* Match padding of links */
+    cursor: default; /* Indicate it's not a direct link */
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+
+/* Style for the dropdown content (nested ul) */
+.dropdown-content {
+    display: none; /* Hide dropdown by default */
+    position: absolute;
+    background-color: #2c2c2c; /* Darker background for dropdown */
+    min-width: 160px; /* Minimum width */
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4); /* Softer shadow */
+    z-index: 100; /* Ensure it appears above other content */
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    top: 100%;
+    left: 0;
+    border-radius: 4px; /* Rounded corners for dropdown */
+    overflow: hidden; /* Ensure corners are rounded */
+}
+
+.dropdown-content li {
+    padding: 0; /* Remove padding from dropdown list items */
+    margin: 0; /* Remove margin from dropdown list items */
+}
+
+/* Style for links inside the dropdown */
+.dropdown-content li a {
+    color: #e0e0e0; /* Light text color for dropdown links */
+    padding: 10px 16px; /* Padding for dropdown links */
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    font-size: 0.9rem; /* Slightly smaller font size */
+    font-weight: 400;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dropdown-content li a:hover {
+    background-color: #3a3a3a; /* Darker background on hover */
+    color: #ffffff; /* White text on hover */
+}
+
+/* Show the dropdown content when the parent .nav-item is hovered */
+.nav-item:hover .dropdown-content {
+    display: block;
+}
+
+
+/* Content area */
+.content {
+    flex-grow: 1; /* Allows content to take up remaining space */
+    padding: 24px; /* Padding around the main content */
+    overflow-y: auto; /* Add vertical scroll if content overflows */
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Contenedor principal de la pantalla de inicio */
+.container {
+    max-width: none;
+    margin: 0 auto;
+    padding: 20px;
+    /* CAMBIO: Usar un fondo más oscuro para el contenedor principal, similar al fondo del body */
+    background-color: #121212; /* O un gris muy oscuro, ej: #181818 */
+    border-radius: 8px;
+    box-shadow: none; /* Eliminar sombra del contenedor principal si quieres que las tarjetas internas tengan sombra */
+    margin-bottom: 24px;
+    /* Añadir un borde sutil si quieres delimitar el área principal */
+    /* border: 1px solid #212121; */
+}
+
+/* Encabezados principales */
+h2 {
+    font-size: 2rem;
+    font-weight: 400;
+    color: #e0e0e0;
+    margin-top: 0;
+    margin-bottom: 24px;
+}
+
+/* Sub-encabezados */
+h3 {
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: #bdbdbd; /* Color de texto ligeramente más tenue */
+    margin-top: 24px;
+    margin-bottom: 16px;
+}
+
+/* Estilo de Formularios */
+form div {
+    margin-bottom: 20px; /* Espacio entre grupos de formulario */
+}
+
+label {
+    display: block; /* Etiqueta en su propia línea */
+    font-size: 0.875rem;
+    color: #bdbdbd; /* Color para etiquetas */
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="date"],
+input[type="number"],
+textarea,
+select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #424242; /* Borde oscuro */
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+    appearance: none; /* Eliminar apariencia nativa en algunos navegadores */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: #2c2c2c; /* Fondo oscuro para inputs */
+    color: #e0e0e0; /* Texto claro en inputs */
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Specific styles for the password input field - Added */
+input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #424242; /* Dark border */
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+    appearance: none; /* Remove native appearance */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: #2c2c2c; /* Dark background */
+    color: #e0e0e0; /* Light text */
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+
+/* Estilo al enfocar (focus) un input */
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="date"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: #90caf9; /* Borde azul claro al enfocar */
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1), 0 0 8px rgba(144, 202, 249, 0.4); /* Sombra suave al enfocar */
+    background-color: #3a3a3a; /* Fondo un poco más claro al enfocar */
+}
+
+/* Focus state for the password input field - Added */
+input[type="password"]:focus {
+    outline: none;
+    border-color: #90caf9; /* Light blue border on focus */
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1), 0 0 8px rgba(144, 202, 249, 0.4); /* Soft shadow on focus */
+    background-color: #3a3a3a; /* Slightly lighter background on focus */
+}
+
+/* Ocultar flechas (spinners) en inputs de tipo number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield; /* Para Firefox */
+}
+
+/* Estilo de Botones (simulando botón "contained") */
+button {
+    background-color: #90caf9; /* Color primario (ej: Azul Claro 300) */
+    color: #212121; /* Texto oscuro en botón claro */
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-transform: uppercase; /* Texto en mayúsculas */
+    cursor: pointer;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Sombra básica */
+    margin-right: 10px; /* Espacio entre botones */
+}
+
+button:last-child {
+    margin-right: 0;
+}
+
+button:hover {
+    background-color: #bbdefb; /* Color más claro al pasar el ratón */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4); /* Sombra más pronunciada al pasar el ratón */
+}
+
+button:active {
+    background-color: #e3f2fd; /* Color muy claro al hacer click */
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.5); /* Sombra más fuerte al hacer click */
+}
+
+button:disabled {
+    background-color: #424242; /* Fondo gris oscuro cuando está deshabilitado */
+    color: #9e9e9e; /* Texto gris cuando está deshabilitado */
+    cursor: not-allowed; /* Cursor de no permitido */
+    box-shadow: none; /* Sin sombra al estar deshabilitado */
+}
+
+/* Estilo específico para botones "danger" (ej: eliminar) */
+/* Apuntamos a ellos usando estilos inline por ahora, idealmente usar una clase CSS dedicada */
+button[style*="margin-left: 10px"][style*="background-color: rgb(239, 154, 154)"] {
+    background-color: #ef9a9a !important; /* Rojo claro (ej: Rojo 200) */
+    color: #212121 !important; /* Texto oscuro */
+}
+
+button[style*="margin-left: 10px"][style*="background-color: rgb(239, 154, 154)"]:hover {
+    background-color: #ffcdd2 !important; /* Rojo más claro al pasar el ratón (ej: Rojo 100) */
+}
+button[style*="margin-left: 10px"][style*="background-color: rgb(239, 154, 154)"]:active {
+    background-color: #ffebee !important; /* Rojo muy claro al hacer click */
+}
+button[style*="margin-left: 10px"][style*="background-color: rgb(239, 154, 154)"]:disabled {
+    background-color: #424242 !important; /* Gris oscuro */
+    color: #9e9e9e !important; /* Texto gris */
+}
+
+/* Estilo general de Tablas (para listas completas como Clientes, Ventas, etc.) */
+table {
+    width: 100%;
+    border-collapse: collapse; /* Fusionar bordes */
+    margin-top: 24px;
+    background-color: #1e1e1e; /* Fondo oscuro */
+    border-radius: 8px;
+    overflow: hidden; /* Esconde contenido que sobresale, importante para bordes redondeados */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Sombra */
+}
+
+th, td {
+    text-align: left;
+    padding: 16px 24px; /* Espaciado interno */
+    border-bottom: 1px solid #424242; /* Borde inferior (divisor horizontal) */
+    color: #e0e0e0; /* Texto claro */
+    font-size: 0.9375rem;
+}
+
+th {
+    background-color: #212121; /* Fondo más oscuro para encabezados */
+    font-weight: 500;
+    color: #ffffff; /* Texto blanco en encabezados */
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+}
+
+tbody tr:last-child td {
+    border-bottom: none; /* Eliminar borde inferior de la última fila */
+}
+
+tbody tr:hover {
+    background-color: #2c2c2c; /* Fondo ligeramente más claro al pasar el ratón */
+}
+
+/* Estilo para fila seleccionada (por estilo inline en JS) */
+tbody tr[style*="background-color: rgb(66, 66, 66)"] {
+    background-color: #424242 !important; /* Fondo más oscuro para fila seleccionada */
+    color: #ffffff !important; /* Texto blanco en fila seleccionada */
+}
+tbody tr[style*="background-color: rgb(66, 66, 66)"] td {
+    color: #ffffff !important; /* Asegurar que el texto de las celdas sea blanco */
+}
+
+
+/* Estilo para el formulario de edición inline dentro de una tabla */
+td > div {
+    padding: 10px;
+    border: 1px solid #424242;
+    margin: 10px 0;
+    background-color: #2c2c2c;
+    border-radius: 4px;
+}
+
+td > div h4 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #e0e0e0;
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+td > div form div {
+    margin-bottom: 12px;
+}
+
+/* Estilo de mensajes de Error */
+p[style*="color: red"],
+p[style*="color: rgb(239, 154, 154)"] {
+    color: #ef9a9a !important; /* Rojo claro para errores */
+    font-size: 0.875rem;
+    margin-top: 8px;
+    font-weight: 500;
+}
+/* Estilo de mensajes de Advertencia/Información */
+p[style*="color: orange"],
+p[style*="color: rgb(255, 204, 128)"] {
+    color: #ffcc80 !important; /* Naranja claro para advertencias */
+    font-size: 0.875rem;
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+/* Estilo para inputs read-only o disabled en tema oscuro */
+input[readOnly], input:disabled {
+    background-color: #3a3a3a !important;
+    color: #bdbdbd !important;
+    opacity: 0.8; /* Un poco transparente */
+}
+
+/* Ajuste para el contenedor de botones dentro de formularios */
+form div:last-child {
+    margin-bottom: 0;
+}
+
+/* Ajustes específicos para la visualización del CUIT del cliente en formularios */
+.container form div p {
+    margin: 0;
+    font-size: 1rem;
+    color: #e0e0e0;
+    margin-top: 4px;
+}
+
+
+/* --- INICIO: Estilos para el Overlay y Contenido del Modal --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #2c2c2c;
+    padding: 40px;
+    border-radius: 10px;
+    /* maxWidth se mantiene inline en el componente si es específico */
+    maxHeight: 90%;
+    overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    color: #e0e0e0;
+    font-family: "'Arial', sans-serif";
+    fontSize: 1.1rem;
+    lineHeight: 1.7;
+    position: relative;
+    minWidth: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.3s ease, opacity 0.3s ease;
+}
+
+.modal-content button.primary {
+     background-color: #5cb85c; /* Verde */
+     color: white;
+}
+
+.modal-content button.secondary {
+    background-color: #d9534f; /* Rojo */
+    color: white;
+}
+
+.modal-content button:disabled {
+    background-color: #555;
+    color: #aaa;
+    cursor: not-allowed;
+}
+/* --- FIN: Estilos para el Overlay y Contenido del Modal --- */
+
+
+/* --- INICIO: Estilos específicos para impresión (PDF) - Material UI Light Theme --- */
+@media print {
+    /* Asegurar que el cuerpo y el html tengan fondo blanco y texto oscuro */
+    body, html {
+        background-color: #ffffff !important;
+        color: #212121 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        font-family: 'Roboto', sans-serif !important;
+        font-size: 11pt !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Ocultar elementos que no deben aparecer en el PDF */
+    .print-hidden {
+        display: none !important;
+    }
+     /* Ocultar elementos con la clase print-hidden-section */
+     .print-hidden-section {
+         display: none !important;
+     }
+
+
+    /* Estilos generales para el contenido en impresión */
+    .container, .modal-content {
+        box-shadow: none !important;
+        background-color: #ffffff !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    /* Asegurar que las áreas de texto preformateado no tengan scroll */
+    .preformatted-print-area {
+        max-height: none !important;
+        overflow-y: visible !important;
+        overflow: visible !important;
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+        padding: 8px !important;
+        border: 1px solid #e0e0e0 !important;
+        background-color: #f5f5f5 !important;
+        color: #424242 !important;
+        border-radius: 4px !important;
+    }
+
+    /* Ajustar estilos de tabla para impresión */
+    table {
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+        background-color: #ffffff !important;
+        border-collapse: collapse; /* Fusionar bordes */
+        width: 100%;
+        margin-top: 16px !important;
+        margin-bottom: 16px !important;
+        border: 1px solid #e0e0e0 !important;
+    }
+
+    th, td {
+        border: 1px solid #e0e0e0 !important;
+        padding: 8px 12px !important;
+        color: #212121 !important;
+        background-color: transparent !important;
+        text-align: left !important;
+        vertical-align: top !important;
+    }
+
+    th {
+        background-color: #f5f5f5 !important;
+        font-weight: 500 !important;
+        color: #1976d2 !important;
+        border-bottom: 2px solid #1976d2 !important;
+        text-transform: uppercase !important;
+        font-size: 9pt !important;
+    }
+
+    tbody tr {
+        background-color: transparent !important;
+    }
+
+    tbody tr:nth-child(even) {
+        background-color: #fafafa !important;
+    }
+
+    tbody tr:hover {
+        background-color: transparent !important;
+    }
+
+    /* Asegurar que otros elementos como h2, h3, h4, p, etc. se vean bien */
+    h2 {
+        font-size: 20pt !important;
+        color: #1976d2 !important;
+        margin-bottom: 16px !important;
+        margin-top: 0 !important;
+        font-weight: 500 !important;
+    }
+
+    h3, h4 { /* Added h4 here */
+        font-size: 16pt !important;
+        color: #1976d2 !important;
+        margin-top: 16pt !important;
+        margin-bottom: 8pt !important;
+        font-weight: 500 !important;
+    }
+
+    p {
+        color: #424242 !important;
+        margin-bottom: 8pt !important;
+        font-size: 11pt !important;
+    }
+
+    /* Ajustar estilos de detalle (label/value) */
+    .detail-label {
+        color: #212121 !important;
+        font-weight: 500 !important;
+    }
+
+    .detail-row span {
+        color: #424242 !important;
+        text-align: right !important;
+    }
+
+    /* Ajustar estilos para la sección de totales */
+    .totals-section {
+        background-color: #f5f5f5 !important;
+        border-top: 1px solid #e0e0e0 !important;
+        padding: 8pt !important;
+        margin-top: 16pt !important;
+        border-radius: 4pt !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+    }
+
+    .totals-section .section-title {
+        border-bottom: 1px solid #e0e0e0 !important;
+        padding-bottom: 4pt !important;
+        margin-bottom: 8pt !important;
+        color: #1976d2 !important;
+    }
+
+    .total-row {
+        margin-bottom: 4pt !important;
+    }
+
+    .total-label {
+        color: #212121 !important;
+        font-weight: 500 !important;
+    }
+
+    .total-row span:last-child {
+        color: #1976d2 !important;
+    }
+
+    /* Asegurar que los colores de texto y fondo sean correctos */
+    p, div, span, h1, h2, h3, h4, h5, h6 {
+        color: #212121 !important;
+        background-color: transparent !important;
+    }
+
+    a {
+        text-decoration: none !important;
+        color: #1976d2 !important;
+    }
+
+    img {
+        display: inline-block !important;
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    /* Asegurar que los inputs readOnly o disabled tengan estilos claros */
+    input[readOnly],
+    input:disabled {
+        background-color: #f5f5f5 !important;
+        color: #424242 !important;
+        border-color: #e0e0e0 !important;
+        opacity: 1 !important;
+    }
+
+}
+/* --- FIN: Estilos específicos para impresión (PDF) --- */
+
+
+/* --- INICIO: Estilos específicos para las secciones de pendientes en Home.js --- */
+/* Contenedor para las secciones de pendientes (apiladas verticalmente) */
+.pending-lists-container {
+    /* Este div solo apila las secciones verticalmente. No necesita estilos flex */
+    /* Añadir padding si quieres espacio alrededor de las tarjetas dentro del contenedor principal */
+     padding: 0 10px; /* Ejemplo de padding */
+}
+
+/* Estilo común para cada sección de pendientes (Ventas, VentasX, Compras) - AHORA SERÁN LAS TARJETAS */
+.pending-section {
+    /* CAMBIO: Usar un fondo ligeramente más claro para la tarjeta individual */
+    background-color: #1e1e1e; /* Color del fondo de las tarjetas de sección */
+    border: 1px solid #424242; /* Borde sutil de la tarjeta */
+    padding: 15px;
+    border-radius: 8px; /* Bordes redondeados para la tarjeta */
+    margin-bottom: 20px; /* Espacio entre tarjetas */
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto; /* Asegura scroll si el contenido (tabla) es muy ancho */
+    /* Añadir sombra a la tarjeta individual si quieres que destaque */
+     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Sombra sutil */
+}
+
+/* Estilo para el título H3 dentro de cada sección de pendientes (dentro de la tarjeta) */
+.pending-section h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #424242; /* Línea separadora bajo el título dentro de la tarjeta */
+    padding-bottom: 10px;
+    margin-bottom: 10px; /* Espacio entre título y tabla */
+    color: #e0e0e0;
+}
+
+/* Estilo general para la tabla de pendientes dentro de la tarjeta */
+.pending-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px; /* Espacio entre título H3 y la tabla */
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    /* CAMBIO: Eliminar borde exterior de la tabla, ya que la tarjeta .pending-section tiene el borde */
+    border: none;
+    border-radius: 0; /* Eliminar bordes redondeados de la tabla si la tarjeta los tiene */
+    overflow: hidden;
+    box-shadow: none; /* Eliminar sombra de la tabla */
+    /* Añadir table-layout fixed para intentar alinear columnas */
+    table-layout: fixed; /* <-- Añadido para intentar alinear columnas */
+}
+
+/* Estilo para las celdas de encabezado (<th>) y datos (<td>) */
+.pending-table th,
+.pending-table td {
+    /* Eliminar el borde general que crea divisores verticales */
+    border: none; /* <-- CAMBIO CLAVE: Eliminar todos los bordes */
+
+    /* Aplicar solo borde inferior para divisores horizontales */
+    border-bottom: 1px solid #424242; /* Borde solo en la parte inferior */
+    padding: 8px;
+    text-align: left;
+    /* Asegurar que el contenido no se desborde */
+    overflow: hidden; /* Oculta contenido que desborda */
+    text-overflow: ellipsis; /* Añade puntos suspensivos si el texto es muy largo */
+    white-space: nowrap; /* Evita que el texto se envuelva */
+}
+
+/* Estilo específico para las celdas de encabezado */
+.pending-table th {
+    background-color: #2a2a2a; /* Fondo para encabezados */
+    font-weight: bold;
+    color: #bdbdbd;
+    border-bottom: 1px solid #555; /* Borde inferior más fuerte para el encabezado */
+}
+
+/* Asegurar que la última fila del cuerpo no tenga borde inferior extra */
+.pending-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Estilo para las filas impares del cuerpo de la tabla para alternar color */
+.pending-table tbody tr:nth-child(odd) {
+    background-color: #1a1a1a; /* Color de fondo para filas impares */
+}
+
+/* Estilo para las filas pares del cuerpo de la tabla para alternar color */
+.pending-table tbody tr:nth-child(even) {
+    background-color: #1f1f1f; /* Color de fondo para filas pares */
+}
+
+/* Estilo al pasar el ratón por encima de una fila */
+.pending-table tbody tr:hover {
+    background-color: #282828; /* Color de fondo al pasar el ratón */
+    cursor: pointer; /* Cambiar cursor para indicar que es clickeable (para el próximo paso) */
+}
+
+/* Asegurar que los spans de Estado y Pago se muestren correctamente */
+.pending-table td span {
+     display: inline-block;
+     padding: 2px 5px;
+     border-radius: 3px;
+     font-weight: bold;
+     color: #212121;
+     /* Los colores de fondo para Estado y Pago se aplican inline en el componente React */
+}
+
+/* --- INICIO: Definir anchos para las columnas de las tablas de pendientes --- */
+/* Esto es crucial para table-layout: fixed */
+/* Ajusta estos porcentajes según sea necesario para que las columnas se alineen visualmente */
+.pending-table th:nth-child(1), /* Fecha */
+.pending-table td:nth-child(1) {
+    width: 10%; /* Ajusta el ancho según necesites */
+}
+
+.pending-table th:nth-child(2), /* Fact Nro / Nro VentaX */
+.pending-table td:nth-child(2) {
+    width: 15%; /* Ajusta el ancho */
+}
+
+.pending-table th:nth-child(3), /* Cliente / Proveedor */
+.pending-table td:nth-child(3) {
+    width: 25%; /* Ajusta el ancho */
+}
+
+.pending-table th:nth-child(4), /* Estado */
+.pending-table td:nth-child(4) {
+    width: 15%; /* Ajusta el ancho */
+}
+
+.pending-table th:nth-child(5), /* Pago */
+.pending-table td:nth-child(5) {
+    width: 15%; /* Ajusta el ancho */
+}
+
+.pending-table th:nth-child(6), /* Total USD / Monto Total USD */
+.pending-table td:nth-child(6) {
+    width: 20%; /* Ajusta el ancho */
+}
+/* --- FIN: Definir anchos para las columnas de las tablas de pendientes --- */
+
+
+/* --- FIN: Estilos específicos para las secciones de pendientes en Home.js --- */
+
+
+/* Puedes añadir estilos específicos para las columnas si necesitas ajustar anchos, por ejemplo: */
+/* .pending-table th:nth-child(1), .pending-table td:nth-child(1) { width: 10%; } */
+/* .pending-table th:nth-child(2), .pending-table td:nth-child(2) { width: 15%; } */
+/* etc. */
