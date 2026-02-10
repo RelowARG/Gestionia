@@ -1,4 +1,4 @@
-// src/App.js (Modificado para manejar edición en ListaVentasXGlobal)
+// src/App.js
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -18,14 +18,17 @@ import ListaVentasGlobal from './components/ListaVentasGlobal';
 import VentaEditor from './components/ventas/VentaEditor';
 // Importar ListaVentasXGlobal y el nuevo VentaXEditor
 import ListaVentasXGlobal from './components/ListaVentasXGlobal';
-import VentaXEditor from './components/ventasx/VentaXEditor'; // <-- ASEGÚRATE DE IMPORTAR VentaXEditor
+import VentaXEditor from './components/ventasx/VentaXEditor';
 import ListaComprasGlobal from './components/ListaComprasGlobal';
 import CashFlow from './components/CashFlow';
 import Statistics from './components/Statistics';
 import Balance from './components/Balance';
 import Login from './components/Login';
 import ListaUsuarios from './components/ListaUsuarios';
+
+// --- NUEVO COMPONENTE IA ---
 import IAWidget from './components/IAWidget';
+// ---------------------------
 
 // Importar el archivo CSS
 import './styles.css';
@@ -105,7 +108,7 @@ function App() {
                                         const [editingVentaId, setEditingVentaId] = useState(null);
                                         const handleEditFromGlobal = (ventaId) => setEditingVentaId(ventaId);
                                         const handleCancelEdit = () => setEditingVentaId(null);
-                                        const handleSaveSuccess = () => setEditingVentaId(null); // Quizás recargar lista
+                                        const handleSaveSuccess = () => setEditingVentaId(null);
 
                                         return (
                                             editingVentaId ? (
@@ -123,16 +126,13 @@ function App() {
                             }
                         />
 
-                        {/* --- NUEVA LÓGICA PARA /listados-ventasx --- */}
                         <Route
                             path="/listados-ventasx"
                             element={
                                 <ProtectedRoute>
                                     {(() => {
-                                        // Estado local DENTRO de esta ruta para saber qué VENTA X se está editando
-                                        const [editingVentaXId, setEditingVentaXId] = useState(null); // Estado específico para VentasX
+                                        const [editingVentaXId, setEditingVentaXId] = useState(null);
 
-                                        // Handlers para la comunicación entre ListaVentasXGlobal y VentaXEditor
                                         const handleEditVentaXFromGlobal = (ventaXId) => {
                                             console.log("App.js: Solicitud de edición recibida para Venta X ID:", ventaXId);
                                             setEditingVentaXId(ventaXId);
@@ -146,19 +146,16 @@ function App() {
                                         const handleSaveSuccessVentaX = () => {
                                             console.log("App.js: Cambios en Venta X guardados. Volviendo a la lista.");
                                             setEditingVentaXId(null);
-                                            // Aquí podrías añadir lógica para refrescar la lista de ListaVentasXGlobal si es necesario
                                         };
 
-                                        // Renderizar condicionalmente VentaXEditor o ListaVentasXGlobal
                                         return (
                                             editingVentaXId ? (
                                                 <VentaXEditor
-                                                    ventaId={editingVentaXId} // Pasar el ID de la Venta X
+                                                    ventaId={editingVentaXId}
                                                     onCancel={handleCancelEditVentaX}
                                                     onSaveSuccess={handleSaveSuccessVentaX}
                                                 />
                                             ) : (
-                                                // Pasar la función correcta a onEditSale
                                                 <ListaVentasXGlobal onEditSale={handleEditVentaXFromGlobal} />
                                             )
                                         );
@@ -166,7 +163,6 @@ function App() {
                                 </ProtectedRoute>
                             }
                         />
-                        {/* --- FIN NUEVA LÓGICA --- */}
 
                         <Route path="/listados-compras" element={<ProtectedRoute><ListaComprasGlobal /></ProtectedRoute>} />
                         <Route path="/cashflow" element={<ProtectedRoute><CashFlow /></ProtectedRoute>} />
@@ -178,13 +174,13 @@ function App() {
 
                     </Routes>
                 </div>
-                <IAWidget />
+                
+                {/* --- AGREGAR WIDGET DE IA AQUÍ --- */}
+                {/* Solo se muestra si el usuario está autenticado */}
+                {isAuthenticated && <IAWidget />}
             </div>
         </Router>
-        
     );
 }
 
 export default App;
-
-//hola

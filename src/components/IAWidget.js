@@ -1,8 +1,8 @@
+// src/components/IAWidget.js
 import React, { useState, useEffect, useRef } from 'react';
-import './IAWidget.css'; // <--- IMPORTANTE: Aquí importamos los estilos
+import './IAWidget.css'; 
 
 const IAWidget = () => {
-    // --- ESTADOS ---
     const [isOpen, setIsOpen] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('tasks'); 
@@ -17,9 +17,10 @@ const IAWidget = () => {
     const [loadingChat, setLoadingChat] = useState(false);
     
     const chatEndRef = useRef(null);
-    const API_URL = 'http://localhost:3001/api/ia';
+    
+    // *** AQUÍ ESTÁ TU IP DE TAILSCALE ***
+    const API_URL = 'http://100.115.111.50:3001/api/ia';
 
-    // --- EFECTOS ---
     useEffect(() => {
         if (isOpen) fetchTasks();
     }, [isOpen]);
@@ -30,12 +31,15 @@ const IAWidget = () => {
         }
     }, [chatHistory, activeTab, isExpanded]);
 
-    // --- LÓGICA ---
     const fetchTasks = async () => {
         setLoadingTasks(true);
         try {
             const timestamp = new Date().getTime(); 
-            const res = await fetch(`${API_URL}/tasks?t=${timestamp}`);
+            // Obtenemos el token almacenado (aunque el backend lo permite sin token por ahora, es buena práctica enviarlo)
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`${API_URL}/tasks?t=${timestamp}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if(!res.ok) throw new Error("Error fetching");
             const data = await res.json();
             setTasks(Array.isArray(data) ? data : []);
@@ -55,10 +59,15 @@ const IAWidget = () => {
         setChatInput('');
         setLoadingChat(true);
         
+        const token = localStorage.getItem('authToken');
+
         try {
             const res = await fetch(`${API_URL}/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ question: msg })
             });
             const data = await res.json();
@@ -96,91 +105,49 @@ const IAWidget = () => {
         });
     };
 
-    // --- RENDERIZADO (Ahora mucho más limpio) ---
     return (
         <div className="ia-container">
-            {/* VENTANA (Manejamos clases dinámicas para open/expanded) */}
             <div className={`ia-window ${isOpen ? 'open' : ''} ${isExpanded ? 'expanded' : ''}`}>
-                
-                {/* HEADER */}
                 <div className="ia-header">
-                    <div className="ia-header-title">
-                        🤖 Gerente Labeltech
-                    </div>
+                    <div className="ia-header-title">🤖 Gerente Labeltech</div>
                     <div className="ia-header-actions">
                         <button onClick={fetchTasks} className="ia-btn-icon" title="Actualizar">🔄</button>
-                        <button onClick={() => setIsExpanded(!isExpanded)} className="ia-btn-icon" title={isExpanded ? "Achicar" : "Agrandar"}>
-                            {isExpanded ? '↙' : '↗'}
-                        </button>
+                        <button onClick={() => setIsExpanded(!isExpanded)} className="ia-btn-icon" title={isExpanded ? "Achicar" : "Agrandar"}>{isExpanded ? '↙' : '↗'}</button>
                         <button onClick={() => setIsOpen(false)} className="ia-btn-icon ia-btn-close">×</button>
                     </div>
                 </div>
 
-                {/* TABS */}
                 <div className="ia-tabs">
-                    <button 
-                        className={`ia-tab ${activeTab === 'tasks' ? 'active' : ''}`} 
-                        onClick={() => setActiveTab('tasks')}
-                    >
-                        Tareas {tasks.length > 0 && `(${tasks.length})`}
-                    </button>
-                    <button 
-                        className={`ia-tab ${activeTab === 'chat' ? 'active' : ''}`} 
-                        onClick={() => setActiveTab('chat')}
-                    >
-                        Chat Virtual
-                    </button>
+                    <button className={`ia-tab ${activeTab === 'tasks' ? 'active' : ''}`} onClick={() => setActiveTab('tasks')}>Tareas {tasks.length > 0 && `(${tasks.length})`}</button>
+                    <button className={`ia-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>Chat Virtual</button>
                 </div>
 
-                {/* CONTENIDO */}
                 <div className="ia-content">
                     {activeTab === 'tasks' ? (
                         loadingTasks ? (
-                            <div className="ia-loading-state">
-                                <div style={{fontSize:'24px', marginBottom:'10px'}}>⏳</div>
-                                Analizando datos...
-                            </div>
+                            <div className="ia-loading-state"><div style={{fontSize:'24px', marginBottom:'10px'}}>⏳</div>Analizando datos...</div>
                         ) : tasks.length === 0 ? (
-                            <div className="ia-empty-state">
-                                <div style={{fontSize:'40px', marginBottom:'10px'}}>✅</div>
-                                <p>¡Todo al día! No hay alertas.</p>
-                            </div>
+                            <div className="ia-empty-state"><div style={{fontSize:'40px', marginBottom:'10px'}}>✅</div><p>¡Todo al día! No hay alertas.</p></div>
                         ) : (
                             tasks.map(task => (
-                                // Clase dinámica según tipo: ia-task-card mensaje / cobranza / recupero
                                 <div key={task.id} className={`ia-task-card ${task.tipo}`}>
-                                    <span className={`ia-badge ${task.tipo}`}>
-                                        {task.tipo === 'mensaje' ? '💬 NUEVO' : task.tipo}
-                                    </span>
+                                    <span className={`ia-badge ${task.tipo}`}>{task.tipo === 'mensaje' ? '💬 NUEVO' : task.tipo}</span>
                                     <b className="ia-task-title">{task.titulo}</b>
                                     <p className="ia-task-subtitle">{task.subtitulo}</p>
-                                    
                                     <div className="ia-task-preview">"{task.mensaje}"</div>
-
                                     {task.telefono ? (
-                                        <a 
-                                            href={`https://wa.me/${task.telefono}?text=${encodeURIComponent(task.mensaje)}`} 
-                                            target="_blank" rel="noreferrer" 
-                                            className="ia-wa-button"
-                                        >
-                                            📲 Enviar WhatsApp
-                                        </a>
+                                        <a href={`https://wa.me/${task.telefono}?text=${encodeURIComponent(task.mensaje)}`} target="_blank" rel="noreferrer" className="ia-wa-button">📲 Enviar WhatsApp</a>
                                     ) : (
-                                        <button disabled className="ia-wa-button disabled">
-                                            🚫 Falta Teléfono
-                                        </button>
+                                        <button disabled className="ia-wa-button disabled">🚫 Falta Teléfono</button>
                                     )}
                                 </div>
                             ))
                         )
                     ) : (
-                        /* CHAT */
                         <div className="ia-chat-container">
                             {chatHistory.map((msg, idx) => (
                                 <div key={idx} style={{display:'flex', justifyContent: msg.sender==='user'?'flex-end':'flex-start'}}>
-                                    <div className={`ia-bubble ${msg.sender}`}>
-                                        {formatText(msg.text)}
-                                    </div>
+                                    <div className={`ia-bubble ${msg.sender}`}>{formatText(msg.text)}</div>
                                 </div>
                             ))}
                             {loadingChat && <div style={{color:'#95a5a6', fontSize:'12px', marginLeft:'10px', marginTop:'5px'}}>Escribiendo...</div>}
@@ -191,23 +158,12 @@ const IAWidget = () => {
 
                 {activeTab === 'chat' && (
                     <form className="ia-chat-input-area" onSubmit={handleChatSubmit}>
-                        <input 
-                            className="ia-chat-input"
-                            value={chatInput} 
-                            onChange={e=>setChatInput(e.target.value)} 
-                            placeholder="Escribe aquí..." 
-                        />
+                        <input className="ia-chat-input" value={chatInput} onChange={e=>setChatInput(e.target.value)} placeholder="Escribe aquí..." />
                         <button type="submit" className="ia-chat-send-btn">➤</button>
                     </form>
                 )}
             </div>
-            
-            {/* BOTÓN FLOTANTE */}
-            {!isOpen && (
-                <button className="ia-fab" onClick={() => setIsOpen(true)}>
-                    🤖
-                </button>
-            )}
+            {!isOpen && <button className="ia-fab" onClick={() => setIsOpen(true)}>🤖</button>}
         </div>
     );
 };

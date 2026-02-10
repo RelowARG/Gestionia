@@ -1,8 +1,8 @@
 const cron = require('node-cron');
 const { model } = require('./core');
-const db = require('../db');
+const dbMiddleware = require('../db');
+const pool = dbMiddleware.pool; 
 
-// Función para redactar el mensaje de WhatsApp usando IA
 async function generateReconnectionMessage(nombreCliente) {
     const prompt = `
         Escribe un mensaje de WhatsApp para un cliente llamado "${nombreCliente}".
@@ -21,25 +21,21 @@ async function generateReconnectionMessage(nombreCliente) {
 
 async function runDailyAnalysis() {
     console.log('--- 🧠 Iniciando Análisis de IA (Scheduler) ---');
-
-    // Query para detectar clientes perdidos (>30 días sin comprar)
-    // Ajusta los nombres de tablas (Clientes, Ventas) según tu DB real si difieren
     const queryClientes = `
-        SELECT c.id, c.nombre, c.telefono, MAX(v.fecha) as ultima_compra
+        SELECT c.id, c.Empresa as nombre, c.Telefono as telefono, MAX(v.Fecha) as ultima_compra
         FROM Clientes c
-        JOIN Ventas v ON c.id = v.cliente_id
+        JOIN Ventas v ON c.id = v.Cliente_id
         GROUP BY c.id
         HAVING ultima_compra < DATE_SUB(NOW(), INTERVAL 30 DAY)
         LIMIT 3; 
     `;
 
     try {
-        const [clientes] = await db.promise().query(queryClientes);
+        // CORRECCIÓN: Usamos pool.query directamente
+        const [clientes] = await pool.query(queryClientes);
 
         for (const cliente of clientes) {
-            // Verificar si ya generamos una alerta para este cliente HOY
-            // Buscamos dentro del JSON de datos_extra o por fecha
-            const [existe] = await db.promise().query(`
+            const [existe] = await pool.query(`
                 SELECT id FROM IA_Insights 
                 WHERE tipo = 'WHATSAPP_SUGERIDO' 
                 AND datos_extra LIKE ? 
@@ -47,12 +43,8 @@ async function runDailyAnalysis() {
             `, [`%"cliente_id":${cliente.id}%`]);
 
             if (existe.length === 0) {
-                // Generar mensaje con Gemini
                 const mensajeWhatsapp = await generateReconnectionMessage(cliente.nombre);
-
-                // Preparar datos para tu tabla
                 const analisis = `El cliente ${cliente.nombre} no compra desde el ${new Date(cliente.ultima_compra).toLocaleDateString()}.`;
-                
                 const datosExtra = {
                     cliente_id: cliente.id,
                     nombre_cliente: cliente.nombre,
@@ -61,8 +53,7 @@ async function runDailyAnalysis() {
                     titulo: `Recuperar a ${cliente.nombre}`
                 };
 
-                // Insertar en la DB
-                await db.promise().query(
+                await pool.query(
                     `INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`,
                     [
                         'WHATSAPP_SUGERIDO',
@@ -80,7 +71,6 @@ async function runDailyAnalysis() {
 }
 
 function initScheduler() {
-    // Configurado para correr todos los días a las 10:00 AM
     cron.schedule('0 10 * * *', () => {
         runDailyAnalysis();
     });

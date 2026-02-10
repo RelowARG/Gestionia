@@ -1,13 +1,11 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const { pool } = require('../db');
+const dbMiddleware = require('../db');
+const pool = dbMiddleware.pool;
 
-// Configuración del cliente con persistencia de sesión
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: ['--no-sandbox']
-    }
+    puppeteer: { args: ['--no-sandbox'] }
 });
 
 client.on('qr', (qr) => {
@@ -21,30 +19,25 @@ client.on('ready', () => {
     console.log('✅ WhatsApp Conectado y Escuchando mensajes...');
 });
 
-// --- ESCUCHA DE MENSAJES (ENTRANTES Y SALIENTES) ---
 client.on('message_create', async (msg) => {
     try {
-        // Ignorar estados y grupos
         if (msg.from.includes('@g.us') || msg.isStatus) return;
 
-        // 1. Obtener número limpio
         const telefonoFull = msg.fromMe ? msg.to : msg.from;
         let numeroLimpio = telefonoFull.replace(/\D/g, ''); 
-        // Nos quedamos con los últimos 8 dígitos para comparar (evita líos de 549 vs 54)
         const matchNumero = numeroLimpio.slice(-8); 
 
-        // 2. Buscar si el número coincide con algún cliente
-        const db = pool.promise();
+        // CORRECCIÓN: Usamos pool directamente
+        const db = pool;
         const [rows] = await db.query(`
-            SELECT id, Empresa FROM clientes 
+            SELECT id, Empresa FROM Clientes 
             WHERE REPLACE(REPLACE(REPLACE(Telefono, '-', ''), ' ', ''), '+', '') LIKE ?
         `, [`%${matchNumero}%`]);
 
         if (rows.length > 0) {
             const cliente = rows[0];
-            const esMio = msg.fromMe; // true si lo mandé yo, false si lo mandó el cliente
+            const esMio = msg.fromMe;
             
-            // 3. Guardar en historial
             await db.query(`
                 INSERT INTO historial_conversaciones (Cliente_id, Fecha, Emisor, Mensaje)
                 VALUES (?, NOW(), ?, ?)

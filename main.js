@@ -79,7 +79,7 @@ app.on('ready', () => {
           contextIsolation: true,
           webSecurity: false, // ¡¡¡ADVERTENCIA DE SEGURIDAD!!! PERMITE CARGAR file:// URLs.
                               // Usar solo porque el contenido HTML es generado internamente.
-          // sandbox: false, // Considerar si webSecurity: false solo no es suficiente. Probar primero sin esto.
+          sandbox: false, // Considerar si webSecurity: false solo no es suficiente. Probar primero sin esto.
           // enableRemoteModule: false, // Asegurar que esté deshabilitado (default en Electron >= 10)
         },
       });

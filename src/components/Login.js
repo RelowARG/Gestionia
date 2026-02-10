@@ -1,9 +1,6 @@
-// src/components/Login.js (Modificado para almacenar el token)
-import React, { useState } from 'react';
+// src/components/Login.js
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// Acceder a la API expuesta globalmente
-const electronAPI = window.electronAPI;
 
 function Login({ onLoginSuccess }) {
     const [username, setUsername] = useState('');
@@ -12,30 +9,39 @@ function Login({ onLoginSuccess }) {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
+    // Verificación de seguridad al montar
+    useEffect(() => {
+        if (!window.electronAPI) {
+            setError("CRÍTICO: No se pudo cargar la API del sistema (preload.js). Verifica la consola.");
+        }
+    }, []);
+
     const handleLogin = async (e) => {
         e.preventDefault();
         setError(null);
         setLoading(true);
 
+        if (!window.electronAPI) {
+             setError("Error de sistema: API no disponible.");
+             setLoading(false);
+             return;
+        }
+
         try {
-            const response = await electronAPI.apiRequest('POST', '/login', { username, password });
+            const response = await window.electronAPI.apiRequest('POST', '/login', { username, password });
 
             if (response.success) {
                 console.log('Login exitoso:', response.user);
-                // --- NUEVO: Almacenar el token y la información del usuario ---
-                localStorage.setItem('authToken', response.token); // Guardar el token
-                localStorage.setItem('currentUser', JSON.stringify(response.user)); // Guardar info del usuario
-                // --- FIN NUEVO ---
-
+                localStorage.setItem('authToken', response.token);
+                localStorage.setItem('currentUser', JSON.stringify(response.user));
+                
                 if (onLoginSuccess) {
                     onLoginSuccess(response.user);
                 }
                 navigate('/');
-
             } else {
                 setError(response.message || 'Error desconocido al iniciar sesión.');
             }
-
         } catch (err) {
             console.error('Error al intentar iniciar sesión:', err);
             setError(err.message || 'Error de conexión o del servidor.');
@@ -70,9 +76,9 @@ function Login({ onLoginSuccess }) {
                         disabled={loading}
                     />
                 </div>
-                {error && <p style={{ color: '#ef9a9a' }}>{error}</p>}
+                {error && <p style={{ color: '#ef9a9a', fontWeight: 'bold' }}>{error}</p>}
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
-                    <button type="submit" disabled={loading}>
+                    <button type="submit" disabled={loading || !!(error && error.includes("CRÍTICO"))}>
                         {loading ? 'Iniciando...' : 'Iniciar Sesión'}
                     </button>
                 </div>

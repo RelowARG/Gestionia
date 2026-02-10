@@ -1,6 +1,7 @@
 // software-gestion/src/preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
+// *** IP DE TAILSCALE ***
 const API_BASE_URL = 'http://100.115.111.50:3001/api';
 
 const apiRequest = async (method, endpoint, data = null) => {
@@ -42,8 +43,7 @@ contextBridge.exposeInMainWorld(
     apiRequest: apiRequest,
     savePresupuestoPdf: (htmlContent, suggestedFileName) => ipcRenderer.invoke('save-presupuesto-pdf', htmlContent, suggestedFileName),
     exportProductosCsv: () => ipcRenderer.invoke('exportProductosCsv'),
-    
-    getLogoFilePath: () => ipcRenderer.invoke('get-logo-file-path'), // Asegúrate que esto esté aquí
+    getLogoFilePath: () => ipcRenderer.invoke('get-logo-file-path'),
 
     getClients: async () => apiRequest('GET', '/clientes'),
     addClient: async (clientData) => apiRequest('POST', '/clientes', clientData),
@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld(
     getVentaById: async (id) => apiRequest('GET', `/ventas/${id}`),
     updateVenta: async (id, ventaData) => apiRequest('PUT', `/ventas/${id}`, ventaData),
     deleteVenta: async (id) => apiRequest('DELETE', `/ventas/${id}`),
-    getProductos: async () => apiRequest('GET', '/productos'),
+    getProductos: async (search = '') => apiRequest('GET', `/productos?searchTerm=${encodeURIComponent(search)}`),
     addProducto: async (productoData) => apiRequest('POST', '/productos', productoData),
     getProductoById: async (id) => apiRequest('GET', `/productos/${id}`),
     updateProducto: async (id, productoData) => apiRequest('PUT', `/productos/${id}`, productoData),
@@ -185,6 +185,17 @@ contextBridge.exposeInMainWorld(
       return apiRequest('GET', url);
     },
     getKeyBalanceMetrics: async () => apiRequest('GET', '/balance/key-metrics'),
+    
+    // GASTOS
+    getGastos: async () => apiRequest('GET', '/gastos'),
+    addGasto: async (data) => apiRequest('POST', '/gastos', data),
+    getGastoById: async (id) => apiRequest('GET', `/gastos/${id}`),
+    updateGasto: async (id, data) => apiRequest('PUT', `/gastos/${id}`, data),
+    deleteGasto: async (id) => apiRequest('DELETE', `/gastos/${id}`),
+
+    // USUARIOS
+    getUsuarios: () => apiRequest('GET', '/usuarios'),
+    addUsuario: (data) => apiRequest('POST', '/usuarios', data),
   }
 );
 
