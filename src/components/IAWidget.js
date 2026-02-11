@@ -1,6 +1,7 @@
 // src/components/IAWidget.js
 import React, { useState, useEffect, useRef } from 'react';
-import './IAWidget.css'; 
+import './IAWidget.css';
+import miloLogo from '../assets/milo.png';
 
 const IAWidget = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -166,7 +167,24 @@ const IAWidget = () => {
                 </div>
                 {activeTab === 'chat' && <form className="ia-chat-input-area" onSubmit={handleChatSubmit}><input className="ia-chat-input" value={chatInput} onChange={e=>setChatInput(e.target.value)} placeholder="Escribe..." /><button type="submit" className="ia-chat-send-btn">➤</button></form>}
             </div>
-            {!isOpen && <button className="ia-fab" onClick={() => setIsOpen(true)}>🤖</button>}
+            {!isOpen && (
+    <button 
+        className="ia-fab" 
+        onClick={() => setIsOpen(true)}
+        // Agregamos estilos extra al botón para que la imagen quede perfecta
+        style={{ padding: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+        <img 
+            src={miloLogo}
+            alt="Milo" 
+            style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover' 
+            }}
+        />
+    </button>
+)}
         </div>
     );
 };
