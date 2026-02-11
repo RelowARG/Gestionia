@@ -1,7 +1,7 @@
 // software-gestion/src/preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
-// *** IP DE TAILSCALE ***
+// *** TU IP DE TAILSCALE ***
 const API_BASE_URL = 'http://100.115.111.50:3001/api';
 
 const apiRequest = async (method, endpoint, data = null) => {
@@ -45,6 +45,14 @@ contextBridge.exposeInMainWorld(
     exportProductosCsv: () => ipcRenderer.invoke('exportProductosCsv'),
     getLogoFilePath: () => ipcRenderer.invoke('get-logo-file-path'),
 
+    // --- FUNCIONES IA / MILOWSKY ---
+    iaGetTasks: () => apiRequest('GET', '/ia/tasks'),
+    iaChat: (question) => apiRequest('POST', '/ia/chat', { question }),
+    
+    // NUEVA: Ejecutar acción (Auto Enviar / Completar)
+    iaPerformAction: (data) => apiRequest('POST', '/ia/action', data),
+    
+    // --- RESTO DE TUS FUNCIONES (Clientes, Ventas, etc) ---
     getClients: async () => apiRequest('GET', '/clientes'),
     addClient: async (clientData) => apiRequest('POST', '/clientes', clientData),
     getClientById: async (id) => apiRequest('GET', `/clientes/${id}`),
@@ -186,17 +194,13 @@ contextBridge.exposeInMainWorld(
     },
     getKeyBalanceMetrics: async () => apiRequest('GET', '/balance/key-metrics'),
     
-    // GASTOS
     getGastos: async () => apiRequest('GET', '/gastos'),
     addGasto: async (data) => apiRequest('POST', '/gastos', data),
     getGastoById: async (id) => apiRequest('GET', `/gastos/${id}`),
     updateGasto: async (id, data) => apiRequest('PUT', `/gastos/${id}`, data),
     deleteGasto: async (id) => apiRequest('DELETE', `/gastos/${id}`),
 
-    // USUARIOS
     getUsuarios: () => apiRequest('GET', '/usuarios'),
     addUsuario: (data) => apiRequest('POST', '/usuarios', data),
   }
 );
-
-console.log('[Preload Process] API bridge exposed. Backend URL:', API_BASE_URL);

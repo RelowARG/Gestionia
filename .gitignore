@@ -4,3 +4,4 @@ public/desktop.ini
 .wwebjs_auth
 .wwebjs_cache
 out
+.env

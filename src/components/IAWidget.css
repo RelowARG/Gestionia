@@ -303,3 +303,31 @@
 }
 
 .ia-chat-send-btn:hover { background: #2980b9; }
+/* Agrega esto al final de IAWidget.css */
+
+.ia-task-card.recontacto {
+    border-left: 4px solid #d35400; /* Naranja oscuro */
+    background-color: #fff8f0;
+}
+.ia-badge.recontacto {
+    background-color: #d35400;
+    color: white;
+}
+
+.ia-task-card.presupuesto {
+    border-left: 4px solid #8e44ad; /* Violeta */
+    background-color: #fbf5ff;
+}
+.ia-badge.presupuesto {
+    background-color: #8e44ad;
+    color: white;
+}
+
+.ia-task-card.alerta {
+    border-left: 4px solid #c0392b; /* Rojo fuerte */
+    background-color: #fff5f5;
+}
+.ia-badge.alerta {
+    background-color: #c0392b;
+    color: white;
+}
