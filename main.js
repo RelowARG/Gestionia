@@ -1,12 +1,30 @@
 // software-gestion/main.js
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs'); 
+const fs = require('fs');
 const fsPromises = require('fs').promises;
+const { exec } = require('child_process');
 
 let mainWindow;
 
 function createWindow() {
+  // --- LÓGICA DE AUTO-ARRANQUE DEL BACKEND (MILO) ---
+  // 1. Ruta absoluta al ejecutable de PM2 para evitar errores de PATH en el .exe
+  const pm2Path = 'C:\\Users\\Julian\\AppData\\Roaming\\npm\\pm2.cmd';
+  
+  // 2. Comando forzado: Define el HOME neutral y aplica RESTART para salir de estado 'stopped'
+  // Si restart falla (porque el proceso no existe), intenta con start.
+  const pm2Command = `set PM2_HOME=C:\\pm2\\.pm2 && "${pm2Path}" restart milo-backend || "${pm2Path}" start milo-backend`;
+  
+  exec(pm2Command, (error, stdout, stderr) => {
+    if (error) {
+      // Si hay error, lo logueamos para depuración pero permitimos que la app siga
+      console.error(`[Main Process] Intento de arranque de backend: ${error.message}`);
+    } else {
+      console.log('[Main Process] Backend verificado y en marcha vía PM2.');
+    }
+  });
+
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
@@ -22,6 +40,7 @@ function createWindow() {
     show: false,
   });
 
+  // Carga del archivo principal usando ruta relativa al directorio de la app
   mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'));
 
   mainWindow.once('ready-to-show', () => {
@@ -34,28 +53,24 @@ function createWindow() {
 }
 
 app.on('ready', () => {
-  console.log('Electron main process is ready.');
   createWindow();
 
-  // --- MODIFICACIÓN DINÁMICA DEL LOGO ---
+  // --- MANEJADOR PARA EL LOGO DE LABELTECH (PORTÁTIL) ---
   ipcMain.handle('get-logo-file-path', () => {
-    // Detectamos la ruta de la aplicación de forma dinámica
-    // path.join une las piezas correctamente según el sistema operativo
+    // Buscamos el logo dentro de la carpeta del proyecto de forma dinámica
     const logoPath = path.join(app.getAppPath(), 'public', 'images', 'logolabel.png');
     
-    console.log(`[Main Process] Verificando ruta dinámica del logo: ${logoPath}`);
-    
     if (fs.existsSync(logoPath)) {
-      console.log(`[Main Process] ✅ ÉXITO: Logo encontrado en: ${logoPath}`);
       return logoPath;
     } else {
-      console.error(`[Main Process] ❌ ERROR: El logo no existe en la ruta esperada: ${logoPath}`);
-      return null; 
+      console.error(`[Main Process] Logo no encontrado en: ${logoPath}`);
+      return null;
     }
   });
 
+  // --- MANEJADOR PARA GUARDAR PRESUPUESTOS EN PDF ---
   ipcMain.handle('save-presupuesto-pdf', async (event, htmlContent, suggestedFileName) => {
-    let pdfWindow = null; 
+    let pdfWindow = null;
     try {
       const result = await dialog.showSaveDialog(mainWindow, {
         title: 'Guardar Presupuesto como PDF',
@@ -63,21 +78,18 @@ app.on('ready', () => {
         filters: [{ name: 'Archivos PDF', extensions: ['pdf'] }],
       });
 
-      if (result.canceled) {
-        return { success: false, message: 'canceled' };
-      }
+      if (result.canceled) return { success: false, message: 'canceled' };
 
       const filePath = result.filePath;
 
+      // Ventana invisible para renderizar el PDF
       pdfWindow = new BrowserWindow({
-        width: 1200, 
-        height: 800, 
-        show: false,   
+        show: false,
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
-          webSecurity: false, 
-          sandbox: false, 
+          webSecurity: false, // Requerido para cargar el logo local (file://)
+          sandbox: false,
         },
       });
 
@@ -85,9 +97,10 @@ app.on('ready', () => {
       await pdfWindow.loadURL(htmlDataUrl);
       
       const pdfOptions = {
-        printBackground: true, 
-        marginsType: 1,        
+        printBackground: true,
+        marginsType: 1,
       };
+
       const pdfBuffer = await pdfWindow.webContents.printToPDF(pdfOptions);
       await fsPromises.writeFile(filePath, pdfBuffer);
 
@@ -95,7 +108,7 @@ app.on('ready', () => {
 
     } catch (error) {
       console.error('[Main Process - PDF] Error:', error);
-      return { success: false, error: error.message || 'Error en el backend al generar PDF.' };
+      return { success: false, error: error.message };
     } finally {
       if (pdfWindow && !pdfWindow.isDestroyed()) {
         pdfWindow.close();
@@ -103,11 +116,11 @@ app.on('ready', () => {
     }
   });
 
+  // --- MANEJADOR PARA EXPORTACIÓN DE PRODUCTOS ---
   ipcMain.handle('exportProductosCsv', async (event) => {
     try {
       const productos = [
-          { id: 1, codigo: 'P001', Descripcion: 'Producto A', eti_x_rollo: 1000, costo_x_1000: 10, costo_x_rollo: 10, precio: 20, banda: 'B1', material: 'M1', Buje: 'BU1' },
-          { id: 2, codigo: 'P002', Descripcion: 'Producto B', eti_x_rollo: 500, costo_x_1000: 12, costo_x_rollo: 6, precio: 15, banda: 'B2', material: 'M2', Buje: 'BU2' }
+          { id: 1, codigo: 'P001', Descripcion: 'Producto Ejemplo A', eti_x_rollo: 1000, costo_x_1000: 10, costo_x_rollo: 10, precio: 20, banda: 'B1', material: 'M1', Buje: 'BU1' }
       ];
 
       const columns = ['id', 'codigo', 'Descripcion', 'eti_x_rollo', 'costo_x_1000', 'costo_x_rollo', 'precio', 'banda', 'material', 'Buje'];
@@ -129,7 +142,7 @@ app.on('ready', () => {
         filters: [{ name: 'Archivos CSV', extensions: ['csv'] }]
       });
 
-      if (canceled || !csvFilePath) return { success: false, message: 'Exportación cancelada.' };
+      if (canceled || !csvFilePath) return { success: false, message: 'canceled' };
 
       await fsPromises.writeFile(csvFilePath, csvContent, 'utf8');
       return { success: true, filePath: csvFilePath };
