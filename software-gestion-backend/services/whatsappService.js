@@ -39,6 +39,12 @@ client.on('message_create', async (msg) => {
 
         let numeroLimpio = telefonoFull.replace(/\D/g, ''); 
         const matchNumero = numeroLimpio.slice(-8); 
+
+        // VALIDACIÓN DE SEGURIDAD: Evitar matches con "0" o números muy cortos
+        if (!matchNumero || matchNumero.length < 6 || parseInt(matchNumero) === 0) {
+            console.log(`[WA DEBUG] ⚠️ Número inválido o demasiado corto para buscar match: "${matchNumero}". Ignorando.`);
+            return;
+        }
         
         console.log(`[WA DEBUG] 🔍 Buscando cliente en DB con los dígitos: ${matchNumero}`);
 
@@ -130,7 +136,6 @@ async function analizarMensajeEntrante(cliente, mensajeActual, telefono) {
                 iaResponse = iaResponse.replace(/\[SUGERENCIA:\s*Armar\s*Presupuesto\]/gi, '').trim();
             }
 
-            // Cambiamos el tipo para que no diga Recupero
             await pool.query(`INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`, [
                 'NUEVO_MENSAJE', 
                 titulo,
@@ -182,7 +187,6 @@ async function analizarNuevoContacto(mensajeActual, telefono) {
             const nombreLead = partes[1] ? partes[1].trim() : 'Nuevo Contacto';
             const respuestaSugerida = partes[2] ? partes[2].trim() : `¡Hola! Gracias por comunicarte con Labeltech. ¿En qué te podemos ayudar?`;
 
-            // Cambiamos el tipo para que no diga Recupero
             await pool.query(`INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`, [
                 'NUEVO_LEAD', 
                 `👤 Nuevo Lead: ${nombreLead}`,

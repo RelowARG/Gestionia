@@ -4,13 +4,11 @@ const { model } = require('./core');
 const dbMiddleware = require('../db');
 const pool = dbMiddleware.pool;
 
-// --- CONFIGURACIÓN DE SEGURIDAD API ---
 const DELAY_MS = 20000; 
 const MAX_GENERATIONS_PER_RUN = 5; 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// --- AUTO-FIX DE BASE DE DATOS ---
 async function fixDatabaseSchema(db) {
     try {
         await db.query("ALTER TABLE IA_Insights MODIFY COLUMN datos_extra TEXT");
@@ -18,7 +16,6 @@ async function fixDatabaseSchema(db) {
     } catch (e) {}
 }
 
-// --- PARSER SEGURO ---
 function parseSafeJSON(raw) {
     if (typeof raw === 'object' && raw !== null) return raw;
     const str = String(raw);
@@ -37,11 +34,10 @@ function parseSafeJSON(raw) {
     }
 }
 
-// --- GENERADORES DE MENSAJES (IA) ---
-
 async function generateReconnectionMessage(cliente, productos, contacto, intento = 1) {
     const nombreSaludo = contacto && contacto !== 'Encargado' ? contacto : cliente;
-    const context = intento === 1 ? "No compra hace más de 30 días." : "Ya le escribimos hace 2 meses y no respondió/compró.";
+    // Ajustado el contexto para la IA: ahora sabe que son más de 60 días
+    const context = intento === 1 ? "No compra hace más de 60 días." : "Ya le escribimos hace 2 meses y no respondió/compró.";
     
     const prompt = `
         Actúa como Milo, ejecutivo de cuentas de Labeltech.
@@ -60,7 +56,7 @@ async function generateReconnectionMessage(cliente, productos, contacto, intento
     } catch (e) {
         const variaciones = [
             `Hola ${nombreSaludo}, soy Milo de Labeltech. Estaba revisando y vi que hace un tiempito no reponemos stock de ${productos}. ¿Cómo vienen con eso?`,
-            `¿Cómo estás ${nombreSaludo}? Milo de este lado. Te escribo porque hace mucho no preparamos pedido de ${productos} y quería ver si necesitaban asistencia.`
+            `¿Cómo estás ${nombreSaludo}? Milo de este lado. Te escribo porque hace bastante no preparamos pedido de ${productos} y quería ver si necesitaban asistencia.`
         ];
         return variaciones[Math.floor(Math.random() * variaciones.length)];
     }
@@ -79,8 +75,6 @@ async function generateBudgetFollowUp(cliente, numeroPresupuesto, montoStr) {
         return `Hola ${cliente}, soy Milo. ¿Pudieron revisar el presupuesto #${numeroPresupuesto}? Avisame cualquier duda.`;
     }
 }
-
-// --- CORE: LIMPIEZA PROFUNDA Y MEMORIA ---
 
 async function syncAndCleanTasks(db) {
     console.log('🧹 [Mantenimiento] Iniciando limpieza profunda de duplicados y errores...');
@@ -135,8 +129,6 @@ async function syncAndCleanTasks(db) {
     return memoryMap;
 }
 
-// --- VERIFICADORES INFALIBLES ---
-
 async function checkRecentHistory(db, clienteId, tipo, dias) {
     try {
         const [rows] = await db.query(`
@@ -164,6 +156,7 @@ async function checkChatActivity(db, clienteId, dias) {
         const [rows] = await db.query(`
             SELECT id FROM historial_conversaciones 
             WHERE Cliente_id = ? 
+            AND Mensaje NOT LIKE '%iVBORw0KGgo%' 
             AND Fecha >= DATE_SUB(NOW(), INTERVAL ? DAY) 
             LIMIT 1
         `, [clienteId, dias]);
@@ -188,8 +181,6 @@ async function verificarSiSeConvirtioEnVenta(db, clienteId, fechaPresupuesto) {
     } catch (e) { return false; }
 }
 
-// --- ANÁLISIS DIARIO ---
-
 async function runDailyAnalysis() {
     console.log('--- 🧠 Milowsky Scheduler: Iniciando Barrido Seguro ---');
     const db = pool;
@@ -199,15 +190,20 @@ async function runDailyAnalysis() {
         await fixDatabaseSchema(db);
         const memoryMap = await syncAndCleanTasks(db);
 
-        // 1. RECUPERO INICIAL (Sin límite de clientes, analiza a TODOS)
+        // 1. RECUPERO INICIAL (BUSCA EN VENTAS Y VENTASX, MAYOR A 60 DÍAS)
         if (generatedCount < MAX_GENERATIONS_PER_RUN) {
             const [clientes] = await db.query(`
-                SELECT c.id, c.Empresa, c.Contacto, c.Telefono, MAX(v.Fecha) as ultima_compra
-                FROM Clientes c JOIN Ventas v ON c.id = v.Cliente_id
-                GROUP BY c.id
-                HAVING ultima_compra < DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-                ORDER BY SUM(v.Total) DESC
-            `); // Se removió el LIMIT 30
+                SELECT c.id, c.Empresa, c.Contacto, c.Telefono, MAX(AllSales.Fecha) as ultima_compra
+                FROM Clientes c 
+                JOIN (
+                    SELECT Cliente_id, Fecha, Total_ARS FROM Ventas WHERE Cliente_id IS NOT NULL
+                    UNION ALL
+                    SELECT Cliente_id, Fecha, Total_ARS FROM VentasX WHERE Cliente_id IS NOT NULL
+                ) AS AllSales ON c.id = AllSales.Cliente_id
+                GROUP BY c.id, c.Empresa, c.Contacto, c.Telefono
+                HAVING ultima_compra < DATE_SUB(CURDATE(), INTERVAL 60 DAY)
+                ORDER BY SUM(AllSales.Total_ARS) DESC
+            `); 
 
             for (const c of clientes) {
                 if (generatedCount >= MAX_GENERATIONS_PER_RUN) break;
@@ -215,12 +211,25 @@ async function runDailyAnalysis() {
                 const key = `C_${String(c.id)}_WHATSAPP_SUGERIDO`;
                 if (memoryMap.byClient.has(key)) continue; 
                 
+                // Vuelto a 60 días para el escudo de chats recientes
                 const yaHablaron = await checkChatActivity(db, c.id, 60);
                 const yaGeneradoIA = await checkRecentHistory(db, c.id, 'WHATSAPP_SUGERIDO', 60);
                 
                 if (yaHablaron || yaGeneradoIA) continue;
 
-                const [prods] = await db.query(`SELECT p.Descripcion FROM Venta_Items vi JOIN Ventas v ON vi.Venta_id = v.id JOIN Productos p ON vi.Producto_id = p.id WHERE v.Cliente_id = ? GROUP BY p.id ORDER BY SUM(vi.Cantidad) DESC LIMIT 1`, [c.id]);
+                // Buscar producto favorito combinando Ventas y VentasX
+                const [prods] = await db.query(`
+                    SELECT p.Descripcion 
+                    FROM Productos p
+                    JOIN (
+                        SELECT vi.Producto_id, vi.Cantidad FROM Venta_Items vi JOIN Ventas v ON vi.Venta_id = v.id WHERE v.Cliente_id = ? AND vi.Producto_id IS NOT NULL
+                        UNION ALL
+                        SELECT vxi.Producto_id, vxi.Cantidad FROM VentasX_Items vxi JOIN VentasX vx ON vxi.VentaX_id = vx.id WHERE vx.Cliente_id = ? AND vxi.Producto_id IS NOT NULL
+                    ) as combined ON p.id = combined.Producto_id
+                    GROUP BY p.id
+                    ORDER BY SUM(combined.Cantidad) DESC LIMIT 1
+                `, [c.id, c.id]);
+                
                 const prod = prods[0]?.Descripcion || "insumos";
                 
                 const msg = await generateReconnectionMessage(c.Empresa, prod, c.Contacto, 1);
@@ -261,7 +270,17 @@ async function runDailyAnalysis() {
 
                     if (memoryMap.byClient.has(key)) continue;
 
-                    const [compras] = await db.query("SELECT id FROM Ventas WHERE Cliente_id = ? AND Fecha > ?", [cid, intento.fecha]);
+                    // Chequear compras nuevas en Ventas y VentasX
+                    const [compras] = await db.query(`
+                        SELECT id FROM (
+                            SELECT id, Cliente_id, Fecha FROM Ventas
+                            UNION ALL
+                            SELECT id, Cliente_id, Fecha FROM VentasX
+                        ) as AllSales 
+                        WHERE Cliente_id = ? AND Fecha > ?
+                        LIMIT 1
+                    `, [cid, intento.fecha]);
+
                     if (compras.length === 0) {
                         
                         const yaHablaron = await checkChatActivity(db, cid, 60);
