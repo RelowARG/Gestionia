@@ -28,19 +28,38 @@ router.get('/tasks', async (req, res) => {
 router.post('/action', async (req, res) => {
     // dbId es opcional, solo viene si la tarea salió de IA_Insights
     const { taskId, taskType, action, phone, message, original_db_id } = req.body;
-    
-    // action: 'auto_send', 'completed', 'dismiss'
+    const db = pool;
 
     try {
-        if (action === 'auto_send') {
-            if (!phone || !message) return res.status(400).json({error: "Faltan datos para envío"});
-            await enviarMensaje(phone, message);
+        let finalPhone = phone;
+        let finalMessage = message;
+
+        // PARCHE CAZADOR DE LEADS (Resolución Autónoma):
+        // Si el frontend no mandó el teléfono (porque el cliente no tiene ID o es un Lead nuevo)
+        // el backend lo extrae directamente del JSON de la tarea guardada.
+        if (original_db_id && (!finalPhone || !finalMessage)) {
+            const [rows] = await db.query(`SELECT datos_extra FROM IA_Insights WHERE id = ?`, [original_db_id]);
+            if (rows.length > 0 && rows[0].datos_extra) {
+                try {
+                    const data = JSON.parse(rows[0].datos_extra);
+                    if (!finalPhone) finalPhone = data.telefono;
+                    if (!finalMessage) finalMessage = data.mensaje_whatsapp;
+                } catch (e) {
+                    console.error("Error parseando datos_extra en action:", e);
+                }
+            }
         }
 
-        const db = pool;
+        // Ejecutar el envío de WhatsApp
+        if (action === 'auto_send') {
+            if (!finalPhone || !finalMessage) {
+                return res.status(400).json({error: "Faltan datos para envío. No se pudo recuperar teléfono o mensaje."});
+            }
+            await enviarMensaje(finalPhone, finalMessage);
+        }
 
         // ESTRATEGIA HÍBRIDA:
-        // 1. Si tiene 'original_db_id', es una tarea persistente (Recupero) -> Actualizamos IA_Insights
+        // 1. Si tiene 'original_db_id', es una tarea persistente (Recupero, Leads) -> Actualizamos estado
         if (original_db_id) {
             let nuevoEstado = 'completado';
             if (action === 'dismiss') nuevoEstado = 'descartado';

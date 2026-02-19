@@ -103,7 +103,7 @@ async function syncAndCleanTasks(db) {
         let uniqueKey = null;
         let targetSet = null;
 
-        if (data.cliente_id && (row.tipo === 'WHATSAPP_SUGERIDO' || row.tipo === 'RECONTACTO_2')) {
+        if (data.cliente_id && (row.tipo === 'WHATSAPP_SUGERIDO' || row.tipo === 'RECONTACTO_2' || row.tipo === 'NUEVO_MENSAJE')) {
             uniqueKey = `C_${String(data.cliente_id)}_${row.tipo}`;
             targetSet = memoryMap.byClient;
         } else if (data.presupuesto_id && row.tipo === 'SEGUIMIENTO_PPT') {
@@ -137,7 +137,6 @@ async function syncAndCleanTasks(db) {
 
 // --- VERIFICADORES INFALIBLES ---
 
-// 1. Verifica en las Tareas Completadas (ignora espacios en el JSON)
 async function checkRecentHistory(db, clienteId, tipo, dias) {
     try {
         const [rows] = await db.query(`
@@ -149,7 +148,6 @@ async function checkRecentHistory(db, clienteId, tipo, dias) {
         `, [tipo, String(clienteId), dias]);
         return rows.length > 0;
     } catch (e) {
-        // Fallback si la versión de BD no soporta JSON_EXTRACT
         const [rows] = await db.query(`
             SELECT id FROM IA_Insights 
             WHERE tipo = ? 
@@ -161,7 +159,6 @@ async function checkRecentHistory(db, clienteId, tipo, dias) {
     }
 }
 
-// 2. Verifica si HUBO CHARLA REAL en WhatsApp
 async function checkChatActivity(db, clienteId, dias) {
     try {
         const [rows] = await db.query(`
@@ -172,7 +169,7 @@ async function checkChatActivity(db, clienteId, dias) {
         `, [clienteId, dias]);
         return rows.length > 0;
     } catch (e) {
-        return false; // Ignorar si la tabla no existe o hay error temporal
+        return false; 
     }
 }
 
@@ -199,19 +196,18 @@ async function runDailyAnalysis() {
     let generatedCount = 0;
 
     try {
-        // 0. ARREGLAR ESQUEMA Y LIMPIAR
         await fixDatabaseSchema(db);
         const memoryMap = await syncAndCleanTasks(db);
 
-        // 1. RECUPERO INICIAL
+        // 1. RECUPERO INICIAL (Sin límite de clientes, analiza a TODOS)
         if (generatedCount < MAX_GENERATIONS_PER_RUN) {
             const [clientes] = await db.query(`
                 SELECT c.id, c.Empresa, c.Contacto, c.Telefono, MAX(v.Fecha) as ultima_compra
                 FROM Clientes c JOIN Ventas v ON c.id = v.Cliente_id
                 GROUP BY c.id
                 HAVING ultima_compra < DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-                ORDER BY SUM(v.Total) DESC LIMIT 30
-            `);
+                ORDER BY SUM(v.Total) DESC
+            `); // Se removió el LIMIT 30
 
             for (const c of clientes) {
                 if (generatedCount >= MAX_GENERATIONS_PER_RUN) break;
@@ -219,7 +215,6 @@ async function runDailyAnalysis() {
                 const key = `C_${String(c.id)}_WHATSAPP_SUGERIDO`;
                 if (memoryMap.byClient.has(key)) continue; 
                 
-                // DOBLE PROTECCIÓN ANTI-SPAM
                 const yaHablaron = await checkChatActivity(db, c.id, 60);
                 const yaGeneradoIA = await checkRecentHistory(db, c.id, 'WHATSAPP_SUGERIDO', 60);
                 
@@ -269,7 +264,6 @@ async function runDailyAnalysis() {
                     const [compras] = await db.query("SELECT id FROM Ventas WHERE Cliente_id = ? AND Fecha > ?", [cid, intento.fecha]);
                     if (compras.length === 0) {
                         
-                        // DOBLE PROTECCIÓN ANTI-SPAM
                         const yaHablaron = await checkChatActivity(db, cid, 60);
                         const yaGeneradoIA = await checkRecentHistory(db, cid, 'RECONTACTO_2', 90);
                         if (yaHablaron || yaGeneradoIA) continue;
@@ -356,9 +350,7 @@ async function runDailyAnalysis() {
 }
 
 function initScheduler() {
-    // Corre en el minuto 0 de cada hora
     cron.schedule('0 * * * *', () => runDailyAnalysis());
-    // Ejecución inicial de prueba a los 5 segundos de arrancar
     setTimeout(() => runDailyAnalysis(), 5000);
     console.log('✅ Sistema Milowsky V2: Iniciado (Modo Anti-Spam Definitivo - 1 vez por hora)');
 }
