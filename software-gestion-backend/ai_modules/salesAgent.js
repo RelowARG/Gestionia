@@ -18,18 +18,19 @@ function limpiarTelefono(telefono) {
 async function getBusinessContext() {
     try {
         const db = pool;
-        const [ventasHoy] = await db.query(`SELECT COUNT(*) as cantidad, COALESCE(SUM(Total), 0) as dinero FROM Ventas WHERE DATE(Fecha) = CURDATE()`);
+        // Ajustado para que el reporte interno también muestre ARS y deudas de +7 días
+        const [ventasHoy] = await db.query(`SELECT COUNT(*) as cantidad, COALESCE(SUM(Total_ARS), 0) as dinero FROM Ventas WHERE DATE(Fecha) = CURDATE()`);
         const [stockBajo] = await db.query(`SELECT p.Descripcion, s.Cantidad FROM Stock s JOIN Productos p ON s.Producto_id = p.id WHERE s.Cantidad <= 5 LIMIT 5`);
-        const [deudas] = await db.query(`SELECT c.Empresa, SUM(v.Total) as deuda FROM Ventas v JOIN Clientes c ON v.Cliente_id = c.id WHERE v.Pago IN ('Pendiente', 'Parcial', 'Debe') GROUP BY c.id ORDER BY deuda DESC LIMIT 5`);
+        const [deudas] = await db.query(`SELECT c.Empresa, SUM(v.Total_ARS) as deuda FROM Ventas v JOIN Clientes c ON v.Cliente_id = c.id WHERE v.Pago IN ('Pendiente', 'Parcial', 'Debe') AND v.Fecha <= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY c.id ORDER BY deuda DESC LIMIT 5`);
         
         const fmtStock = stockBajo.map(i => `- ${i.Descripcion} (${i.Cantidad}u)`).join('\n');
-        const fmtDeudas = deudas.map(d => `- ${d.Empresa}: $${d.deuda}`).join('\n');
+        const fmtDeudas = deudas.map(d => `- ${d.Empresa}: $${Number(d.deuda).toLocaleString('es-AR')}`).join('\n');
 
         return `
             REPORTE LABELTECH:
-            - Ventas Hoy: ${ventasHoy[0].cantidad} ($${ventasHoy[0].dinero}).
+            - Ventas Hoy: ${ventasHoy[0].cantidad} ($${Number(ventasHoy[0].dinero).toLocaleString('es-AR')}).
             - Stock Crítico: \n${fmtStock}
-            - Mayores Deudores: \n${fmtDeudas}
+            - Mayores Deudores (+7 días): \n${fmtDeudas}
         `;
     } catch (e) { return "Error DB"; }
 }
@@ -74,6 +75,9 @@ async function getOpenTasks() {
                 if (row.tipo === 'RECONTACTO_2') tipoVisual = 'recontacto';
                 if (row.tipo === 'SEGUIMIENTO_PPT') tipoVisual = 'presupuesto';
                 if (row.tipo === 'ALERTA_STOCK') tipoVisual = 'alerta';
+                // Compatibilidad con los nuevos tipos que creamos hoy
+                if (row.tipo === 'NUEVO_LEAD') tipoVisual = 'lead';
+                if (row.tipo === 'NUEVO_MENSAJE') tipoVisual = 'mensaje';
 
                 todasLasTareas.push({
                     id: `insight_${row.id}`,       
@@ -116,21 +120,29 @@ async function getOpenTasks() {
 
         // C. COBRANZAS (Aquí usamos "Milo" para el cliente)
         const [deudas] = await db.query(`
-            SELECT c.id, c.Empresa, c.Telefono, SUM(v.Total) as deuda FROM Ventas v JOIN Clientes c ON v.Cliente_id = c.id
-            WHERE v.Pago IN ('Pendiente', 'Parcial', 'Debe') GROUP BY c.id ORDER BY deuda DESC LIMIT 20
+            SELECT c.id, c.Empresa, c.Telefono, SUM(v.Total_ARS) as deuda 
+            FROM Ventas v 
+            JOIN Clientes c ON v.Cliente_id = c.id
+            WHERE v.Pago IN ('Pendiente', 'Parcial', 'Debe') 
+            AND v.Fecha <= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY c.id 
+            ORDER BY deuda DESC LIMIT 20
         `);
 
         deudas.forEach(c => {
             const id = `cobro_${c.id}`;
             if (!tareasExcluidas.has(id)) {
+                // Formateamos el número para que se vea como moneda local ($ 150.000,00)
+                const montoFormateado = Number(c.deuda).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                
                 todasLasTareas.push({
                     id: id,
                     tipo: 'cobranza',
                     titulo: `Cobrar a ${c.Empresa}`,
-                    subtitulo: `Deuda: $${c.deuda}`,
+                    subtitulo: `Deuda: $${montoFormateado} ARS`,
                     telefono: limpiarTelefono(c.Telefono),
-                    // CAMBIADO A MILO
-                    mensaje: `Hola ${c.Empresa}, soy Milo. Te escribo por el saldo pendiente de $${c.deuda}. ¿Podemos coordinar el pago? Gracias.`
+                    // Mensaje más humano, especificando que es de la semana pasada y en pesos
+                    mensaje: `Hola ${c.Empresa}, soy Milo de Labeltech. Te escribo cortito para avisarte que quedó un saldo pendiente de $${montoFormateado} de la semana pasada. ¿Podemos coordinar el pago? ¡Gracias!`
                 });
             }
         });
