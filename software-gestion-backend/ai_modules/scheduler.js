@@ -4,6 +4,9 @@ const { model } = require('./core');
 const dbMiddleware = require('../db');
 const pool = dbMiddleware.pool;
 
+// --- NUEVO: Importamos el SDK oficial para crear el cerebro aislado del minero ---
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
 const DELAY_MS = 20000; 
 const MAX_GENERATIONS_PER_RUN = 5; 
 
@@ -36,7 +39,6 @@ function parseSafeJSON(raw) {
 
 async function generateReconnectionMessage(cliente, productos, contacto, intento = 1) {
     const nombreSaludo = contacto && contacto !== 'Encargado' ? contacto : cliente;
-    // Ajustado el contexto para la IA: ahora sabe que son más de 60 días
     const context = intento === 1 ? "No compra hace más de 60 días." : "Ya le escribimos hace 2 meses y no respondió/compró.";
     
     const prompt = `
@@ -81,7 +83,7 @@ async function syncAndCleanTasks(db) {
     
     const [rows] = await db.query("SELECT id, tipo, datos_extra, fecha FROM IA_Insights WHERE estado = 'pendiente' ORDER BY id DESC");
     
-    const memoryMap = { byClient: new Set(), byBudget: new Set() };
+    const memoryMap = { byClient: new Set(), byBudget: new Set(), byLead: new Set() };
     const idsToDelete = [];
     const seenKeys = new Set();
 
@@ -103,6 +105,9 @@ async function syncAndCleanTasks(db) {
         } else if (data.presupuesto_id && row.tipo === 'SEGUIMIENTO_PPT') {
             uniqueKey = `P_${String(data.presupuesto_id)}_${row.tipo}`;
             targetSet = memoryMap.byBudget;
+        } else if (row.tipo === 'NUEVO_LEAD' && data.telefono && data.subtitulo && data.subtitulo.includes('Archivo Histórico')) {
+            uniqueKey = `L_${String(data.telefono)}_LEAD`;
+            targetSet = memoryMap.byLead;
         }
 
         if (uniqueKey) {
@@ -211,13 +216,11 @@ async function runDailyAnalysis() {
                 const key = `C_${String(c.id)}_WHATSAPP_SUGERIDO`;
                 if (memoryMap.byClient.has(key)) continue; 
                 
-                // Vuelto a 60 días para el escudo de chats recientes
                 const yaHablaron = await checkChatActivity(db, c.id, 60);
                 const yaGeneradoIA = await checkRecentHistory(db, c.id, 'WHATSAPP_SUGERIDO', 60);
                 
                 if (yaHablaron || yaGeneradoIA) continue;
 
-                // Buscar producto favorito combinando Ventas y VentasX
                 const [prods] = await db.query(`
                     SELECT p.Descripcion 
                     FROM Productos p
@@ -270,7 +273,6 @@ async function runDailyAnalysis() {
 
                     if (memoryMap.byClient.has(key)) continue;
 
-                    // Chequear compras nuevas en Ventas y VentasX
                     const [compras] = await db.query(`
                         SELECT id FROM (
                             SELECT id, Cliente_id, Fecha FROM Ventas
@@ -358,6 +360,73 @@ async function runDailyAnalysis() {
              }
         }
 
+        // 5. ⛏️ EL MINERO DE LEADS AISLADO (CSV)
+        if (generatedCount < MAX_GENERATIONS_PER_RUN) {
+            try {
+                // Buscamos leads antiguos que no hayamos contactado
+                const [leadsExtras] = await db.query(`SELECT id, nombre, telefono FROM Leads_Antiguos WHERE contactado = 0 LIMIT 15`);
+                
+                for (const lead of leadsExtras) {
+                    if (generatedCount >= MAX_GENERATIONS_PER_RUN) break;
+                    
+                    const key = `L_${lead.telefono}_LEAD`;
+                    if (memoryMap.byLead.has(key)) continue;
+
+                    // FILTRO: Si ya es cliente actual (coinciden últimos 8 dígitos), lo marcamos y salteamos
+                    const ultimos8 = lead.telefono.slice(-8);
+                    const [esCliente] = await db.query(`SELECT id FROM Clientes WHERE REPLACE(REPLACE(REPLACE(Telefono, '-', ''), ' ', ''), '+', '') LIKE ? LIMIT 1`, [`%${ultimos8}%`]);
+                    
+                    if (esCliente.length > 0) {
+                        await db.query(`UPDATE Leads_Antiguos SET contactado = 1 WHERE id = ?`, [lead.id]);
+                        continue; 
+                    }
+
+                    const promptMiner = `
+                        Actúa como Milo, gerente de ventas de Labeltech (etiquetas).
+                        Redacta un mensaje de WhatsApp para "${lead.nombre}".
+                        CONTEXTO: Es un contacto muy antiguo de nuestra libreta que nunca se cargó al sistema nuevo. Salúdalo cálidamente, dile que estás actualizando contactos y pregúntale si actualmente en su empresa andan necesitando etiquetas o insumos.
+                        ESTILO: Conversacional, cálido, argentino, cero invasivo.
+                        REGLAS: Solo el texto del mensaje.
+                    `;
+                    
+                    // --- ARQUITECTURA AISLADA (QUOTA ISOLATION) ---
+                    let minerModel = model; // Por defecto usa el cerebro principal si no pusiste la llave
+                    if (process.env.MINER_API_KEY) {
+                        const genAI = new GoogleGenerativeAI(process.env.MINER_API_KEY);
+                        // Instanciamos un cerebro exclusivo para el minero (gemini-1.5-flash es el modelo rápido estándar)
+                        minerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+                    }
+                    
+                    const result = await minerModel.generateContent(promptMiner);
+                    let msgMiner = result.response.text().trim().replace(/^"|"$/g, '');
+
+                    await db.query(`INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`, [
+                        'NUEVO_LEAD', 
+                        `⛏️ Rescatar: ${lead.nombre}`,
+                        JSON.stringify({
+                            cliente_id: null, 
+                            nombre_cliente: lead.nombre, 
+                            telefono: lead.telefono,
+                            mensaje_whatsapp: msgMiner, 
+                            titulo: `⛏️ Rescatar Lead: ${lead.nombre}`,
+                            subtitulo: `Del Archivo Histórico (CSV).`
+                        }), 
+                        'pendiente'
+                    ]);
+
+                    // Lo marcamos como contactado en el minero
+                    await db.query(`UPDATE Leads_Antiguos SET contactado = 1 WHERE id = ?`, [lead.id]);
+                    console.log(`> [${++generatedCount}/${MAX_GENERATIONS_PER_RUN}] ⛏️ Minado con éxito usando cuota aislada: ${lead.nombre}`);
+                    memoryMap.byLead.add(key); 
+                    await delay(DELAY_MS);
+                }
+            } catch (e) {
+                if (e.code !== 'ER_NO_SUCH_TABLE') {
+                    console.error("Error en minero de leads:", e.message);
+                }
+            }
+        }
+
         if (generatedCount >= MAX_GENERATIONS_PER_RUN) {
             console.log('🛑 Límite de seguridad alcanzado (5 tareas). El resto quedará para el próximo turno.');
         }
@@ -371,7 +440,7 @@ async function runDailyAnalysis() {
 function initScheduler() {
     cron.schedule('0 * * * *', () => runDailyAnalysis());
     setTimeout(() => runDailyAnalysis(), 5000);
-    console.log('✅ Sistema Milowsky V2: Iniciado (Modo Anti-Spam Definitivo - 1 vez por hora)');
+    console.log('✅ Sistema Milowsky V2: Iniciado (Modo Anti-Spam + Minero Aislado)');
 }
 
 module.exports = { initScheduler, runDailyAnalysis };
