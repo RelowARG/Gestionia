@@ -10,26 +10,31 @@ echo =================================================
 set "CURRENT_DIR=%~dp0"
 
 :: 1. INICIAR EL CEREBRO (BACKEND PRINCIPAL)
-echo [1/3] Encendiendo el servidor principal y WhatsApp...
+echo [1/4] Encendiendo el servidor principal y WhatsApp...
 cd /d "%CURRENT_DIR%software-gestion-backend"
 
 :: /min inicia la ventana minimizada para no molestar
-:: /k mantiene la ventana abierta por si hay errores
 start "Servidor Labeltech" /min cmd /k "node server.js"
 
 :: Esperamos 2 segundos
 timeout /t 2 /nobreak >nul
 
-:: 2. INICIAR EL MOTOR DE CAMPAÑAS DE MAIL (NUEVO)
-echo [2/3] Encendiendo el Motor de Marketing por Email...
-:: Seguimos en la carpeta del backend, asi que lo lanzamos directo
-start "Campaña Mails Milo" /min cmd /k "node campaña_mails.js"
+:: 2. INICIAR EL MOTOR DE CAMPANAS DE MAIL
+echo [2/4] Encendiendo el Motor de Marketing por Email...
+start "Campana Mails Milo" /min cmd /k "node campana_mails.js"
 
-:: Esperamos 4 segundos para que los dos motores respiren
+:: Esperamos 2 segundos
+timeout /t 2 /nobreak >nul
+
+:: 3. INICIAR EL MINERO DE PDFs (NUEVO)
+echo [3/4] Encendiendo el Minero visual de PDFs...
+start "Minero de PDFs Milo" /min cmd /k "node importar_pdfs.js"
+
+:: Esperamos 4 segundos para que todos los motores respiren
 timeout /t 4 /nobreak >nul
 
-:: 3. ABRIR LA INTERFAZ (CLIENTE)
-echo [3/3] Abriendo aplicacion de escritorio...
+:: 4. ABRIR LA INTERFAZ (CLIENTE)
+echo [4/4] Abriendo aplicacion de escritorio...
 cd /d "%CURRENT_DIR%"
 
 :: Verifica si el archivo existe antes de intentar abrirlo
