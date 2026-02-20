@@ -4,8 +4,7 @@ const { model } = require('./core');
 const dbMiddleware = require('../db');
 const pool = dbMiddleware.pool;
 
-// --- NUEVO: Importamos el SDK oficial para crear el cerebro aislado del minero ---
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// --- SE ELIMINÓ LA IMPORTACIÓN DE GOOGLE SDK AQUÍ PARA EVITAR CONFLICTOS ---
 
 const DELAY_MS = 20000; 
 const MAX_GENERATIONS_PER_RUN = 5; 
@@ -187,7 +186,7 @@ async function verificarSiSeConvirtioEnVenta(db, clienteId, fechaPresupuesto) {
 }
 
 async function runDailyAnalysis() {
-    console.log('--- 🧠 Milowsky Scheduler: Iniciando Barrido Seguro ---');
+    console.log('--- 🧠 Milowsky Scheduler: Analizando Clientes Actuales ---');
     const db = pool;
     let generatedCount = 0;
 
@@ -195,7 +194,7 @@ async function runDailyAnalysis() {
         await fixDatabaseSchema(db);
         const memoryMap = await syncAndCleanTasks(db);
 
-        // 1. RECUPERO INICIAL (BUSCA EN VENTAS Y VENTASX, MAYOR A 60 DÍAS)
+        // 1. RECUPERO INICIAL (CLIENTES ACTUALES)
         if (generatedCount < MAX_GENERATIONS_PER_RUN) {
             const [clientes] = await db.query(`
                 SELECT c.id, c.Empresa, c.Contacto, c.Telefono, MAX(AllSales.Fecha) as ultima_compra
@@ -253,7 +252,7 @@ async function runDailyAnalysis() {
             }
         }
 
-        // 2. RE-CONTACTO
+        // 2. RE-CONTACTO (SEGUNDO INTENTO)
         if (generatedCount < MAX_GENERATIONS_PER_RUN) {
             const [viejos] = await db.query(`
                 SELECT id, datos_extra, fecha FROM IA_Insights 
@@ -307,7 +306,7 @@ async function runDailyAnalysis() {
             }
         }
 
-        // 3. PRESUPUESTOS
+        // 3. PRESUPUESTOS (SEGUIMIENTO)
         if (generatedCount < MAX_GENERATIONS_PER_RUN) {
             const [ppts] = await db.query(`
                 SELECT p.id, p.Total_USD, p.Total_ARS, p.Cliente_id, p.Fecha, c.Empresa, c.Telefono
@@ -343,7 +342,7 @@ async function runDailyAnalysis() {
             }
         }
 
-        // 4. STOCK
+        // 4. ALERTA DE STOCK (INTERNO)
         const [stockCritico] = await db.query(`SELECT s.id, p.Descripcion, s.Cantidad FROM Stock s JOIN Productos p ON s.Producto_id = p.id WHERE s.Cantidad <= 5`);
         if (stockCritico.length > 0) {
              const [hoy] = await db.query(`SELECT id FROM IA_Insights WHERE tipo = 'ALERTA_STOCK' AND DATE(fecha) = CURDATE()`);
@@ -360,75 +359,10 @@ async function runDailyAnalysis() {
              }
         }
 
-        // 5. ⛏️ EL MINERO DE LEADS AISLADO (CSV)
-        if (generatedCount < MAX_GENERATIONS_PER_RUN) {
-            try {
-                // Buscamos leads antiguos que no hayamos contactado
-                const [leadsExtras] = await db.query(`SELECT id, nombre, telefono FROM Leads_Antiguos WHERE contactado = 0 LIMIT 15`);
-                
-                for (const lead of leadsExtras) {
-                    if (generatedCount >= MAX_GENERATIONS_PER_RUN) break;
-                    
-                    const key = `L_${lead.telefono}_LEAD`;
-                    if (memoryMap.byLead.has(key)) continue;
-
-                    // FILTRO: Si ya es cliente actual (coinciden últimos 8 dígitos), lo marcamos y salteamos
-                    const ultimos8 = lead.telefono.slice(-8);
-                    const [esCliente] = await db.query(`SELECT id FROM Clientes WHERE REPLACE(REPLACE(REPLACE(Telefono, '-', ''), ' ', ''), '+', '') LIKE ? LIMIT 1`, [`%${ultimos8}%`]);
-                    
-                    if (esCliente.length > 0) {
-                        await db.query(`UPDATE Leads_Antiguos SET contactado = 1 WHERE id = ?`, [lead.id]);
-                        continue; 
-                    }
-
-                    const promptMiner = `
-                        Actúa como Milo, gerente de ventas de Labeltech (etiquetas).
-                        Redacta un mensaje de WhatsApp para "${lead.nombre}".
-                        CONTEXTO: Es un contacto muy antiguo de nuestra libreta que nunca se cargó al sistema nuevo. Salúdalo cálidamente, dile que estás actualizando contactos y pregúntale si actualmente en su empresa andan necesitando etiquetas o insumos.
-                        ESTILO: Conversacional, cálido, argentino, cero invasivo.
-                        REGLAS: Solo el texto del mensaje.
-                    `;
-                    
-                    // --- ARQUITECTURA AISLADA (QUOTA ISOLATION) ---
-                    let minerModel = model; // Por defecto usa el cerebro principal si no pusiste la llave
-                    if (process.env.MINER_API_KEY) {
-                        const genAI = new GoogleGenerativeAI(process.env.MINER_API_KEY);
-                        // Instanciamos un cerebro exclusivo para el minero (gemini-1.5-flash es el modelo rápido estándar)
-                        minerModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-                    }
-                    
-                    const result = await minerModel.generateContent(promptMiner);
-                    let msgMiner = result.response.text().trim().replace(/^"|"$/g, '');
-
-                    await db.query(`INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`, [
-                        'NUEVO_LEAD', 
-                        `⛏️ Rescatar: ${lead.nombre}`,
-                        JSON.stringify({
-                            cliente_id: null, 
-                            nombre_cliente: lead.nombre, 
-                            telefono: lead.telefono,
-                            mensaje_whatsapp: msgMiner, 
-                            titulo: `⛏️ Rescatar Lead: ${lead.nombre}`,
-                            subtitulo: `Del Archivo Histórico (CSV).`
-                        }), 
-                        'pendiente'
-                    ]);
-
-                    // Lo marcamos como contactado en el minero
-                    await db.query(`UPDATE Leads_Antiguos SET contactado = 1 WHERE id = ?`, [lead.id]);
-                    console.log(`> [${++generatedCount}/${MAX_GENERATIONS_PER_RUN}] ⛏️ Minado con éxito usando cuota aislada: ${lead.nombre}`);
-                    memoryMap.byLead.add(key); 
-                    await delay(DELAY_MS);
-                }
-            } catch (e) {
-                if (e.code !== 'ER_NO_SUCH_TABLE') {
-                    console.error("Error en minero de leads:", e.message);
-                }
-            }
-        }
+        // --- SE ELIMINÓ EL MINERO DE AQUÍ PARA EVITAR SATURAR LA API ---
 
         if (generatedCount >= MAX_GENERATIONS_PER_RUN) {
-            console.log('🛑 Límite de seguridad alcanzado (5 tareas). El resto quedará para el próximo turno.');
+            console.log('🛑 Límite de seguridad alcanzado (5 tareas).');
         }
         console.log('--- 🧠 Fin Barrido ---');
 
@@ -440,7 +374,7 @@ async function runDailyAnalysis() {
 function initScheduler() {
     cron.schedule('0 * * * *', () => runDailyAnalysis());
     setTimeout(() => runDailyAnalysis(), 5000);
-    console.log('✅ Sistema Milowsky V2: Iniciado (Modo Anti-Spam + Minero Aislado)');
+    console.log('✅ Milo Server: Iniciado (Modo Optimizado - Clientes Reales)');
 }
 
 module.exports = { initScheduler, runDailyAnalysis };
