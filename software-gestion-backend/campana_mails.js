@@ -79,11 +79,20 @@ async function ejecutarCampanaDiaria() {
 
             console.log(`\n✍️  Redactando (Llave IA: ${currentKeyIndex + 1}) para: ${lead.nombre}`);
 
-            const prompt = `
-                Sos Milo, ejecutivo de cuentas de Labeltech (Fábrica de etiquetas y cintas).
-                Redactá un correo electrónico profesional para la empresa "${lead.nombre}".
-                ESTRATEGIA: ${anguloElegido}
-                REGLAS: ÚNICAMENTE JSON con "asunto" y "cuerpo". Sin markdown.
+        const prompt = `
+                CONTEXTO: Tu nombre es Milo, ejecutivo de cuentas de Labeltech (Fábrica de etiquetas y Ribbons).
+                IMPORTANTE: Tu nombre de firma es simplemente "Milo". No incluyas la palabra "Sos" en tu nombre ni en tu saludo.
+
+                DESTINATARIO: "${lead.nombre}"
+                
+                INSTRUCCIONES DE LIMPIEZA:
+                1. Analizá el nombre del destinatario. Si contiene números de teléfono, códigos o frases como "Base Histórica", "Archivo" o "Ceyal", ELIMINÁ esa parte.
+                2. Si el nombre de la empresa queda como un número o no es claro, usá un saludo genérico (ej: "Estimados," o "Hola,").
+                3. REGLA DE ORO: BAJO NINGUNA CIRCUNSTANCIA menciones la palabra "Ceyal" o "Ceyal Etiquetas". Somos Labeltech.
+
+                ESTRATEGIA DE VENTA: ${anguloElegido}
+                
+                FORMATO: Entregá ÚNICAMENTE un objeto JSON con las llaves "asunto" y "cuerpo". Sin formato markdown, solo el texto plano.
             `;
 
             try {
