@@ -1,4 +1,4 @@
-// src/components/Navbar.js (Modificado para añadir "Usuarios" dentro de "Configuración")
+// src/components/Navbar.js
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -72,17 +72,19 @@ function Navbar({ onLogout }) {
            </ul>
          </li>
 
-        {/* --- NUEVO: Menú de Configuración con Usuarios dentro --- */}
+         {/* --- NUEVO: ACCESO AL DASHBOARD DE MILO --- */}
+         <li className="nav-item">
+           <Link to="/milo" style={{ fontWeight: 'bold', color: '#3498db' }}>🤖 Milo</Link>
+         </li>
+         {/* --- FIN NUEVO ACCESO --- */}
+
+        {/* Menú de Configuración con Usuarios dentro */}
          <li className="nav-item has-dropdown">
-           Configuración {/* Nuevo elemento del menú principal */}
+           Configuración 
            <ul className="dropdown-content">
-             <li><Link to="/usuarios">Usuarios</Link></li> {/* Mover enlace de Usuarios aquí */}
-             {/* Puedes añadir otros enlaces de configuración aquí en el futuro */}
-             {/* <li><Link to="/configuracion/ajustes">Ajustes Generales</Link></li> */}
+             <li><Link to="/usuarios">Usuarios</Link></li> 
            </ul>
          </li>
-         {/* --- FIN NUEVO MENÚ --- */}
-
 
          {/* Elemento para Cerrar Sesión */}
           <li className="nav-item" onClick={onLogout} style={{ cursor: 'pointer', marginLeft: 'auto' }}>

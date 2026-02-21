@@ -1,10 +1,12 @@
-// software-gestion-backend/ai_modules/scheduler.js
+// E:\Gestionia\software-gestion-backend\ai_modules\scheduler.js
 const cron = require('node-cron');
 const { model } = require('./core');
 const dbMiddleware = require('../db');
 const pool = dbMiddleware.pool;
 
-// --- SE ELIMINÓ LA IMPORTACIÓN DE GOOGLE SDK AQUÍ PARA EVITAR CONFLICTOS ---
+// --- NUEVAS IMPORTACIONES PARA EL CEREBRO HÍBRIDO ---
+const { obtenerContextoCompleto } = require('../milo_modules/historial');
+const { consultaHibrida } = require('../milo_modules/hibrido');
 
 const DELAY_MS = 20000; 
 const MAX_GENERATIONS_PER_RUN = 5; 
@@ -36,32 +38,69 @@ function parseSafeJSON(raw) {
     }
 }
 
-async function generateReconnectionMessage(cliente, productos, contacto, intento = 1) {
+// --- FUNCIÓN ACTUALIZADA: AHORA USA MILO + GEMINI ---
+async function generateReconnectionMessage(cliente, productos, contacto, intento = 1, clienteId = null, email = null) {
     const nombreSaludo = contacto && contacto !== 'Encargado' ? contacto : cliente;
-    const context = intento === 1 ? "No compra hace más de 60 días." : "Ya le escribimos hace 2 meses y no respondió/compró.";
     
-    const prompt = `
-        Actúa como Milo, ejecutivo de cuentas de Labeltech.
-        Redacta un mensaje de WhatsApp para "${nombreSaludo}".
-        CONTEXTO: ${context}
-        PRODUCTO HABITUAL: ${productos}.
-        OBJETIVO: ${intento === 1 ? 'Reactivar la venta con empatía.' : 'Re-conectar suavemente, sin presionar.'}
-        ESTILO: Conversacional, cálido y argentino.
-        REGLAS: Solo el cuerpo del mensaje.
+    // Si tenemos el ID pero no el mail, lo buscamos rápido para que Milo lea los correos
+    if (clienteId && !email) {
+        const [mailRow] = await pool.query("SELECT Mail FROM clientes WHERE id = ?", [clienteId]);
+        if (mailRow.length > 0) email = mailRow[0].Mail;
+    }
+
+    // 1. Buscamos la memoria real del cliente (Chats y Mails)
+    let memoria = { chats: [], mails: [] };
+    if (clienteId) {
+        memoria = await obtenerContextoCompleto(clienteId, email);
+    }
+
+    // Si NO hay historial, usamos la ruta clásica (Solo Gemini)
+    if (memoria.chats.length === 0 && memoria.mails.length === 0) {
+        const context = intento === 1 ? "No compra hace más de 60 días." : "Ya le escribimos hace 2 meses y no respondió/compró.";
+        const prompt = `
+            Actúa como Milo, ejecutivo de cuentas de Labeltech.
+            Redacta un mensaje de WhatsApp para "${nombreSaludo}".
+            CONTEXTO: ${context}
+            PRODUCTO HABITUAL: ${productos}.
+            OBJETIVO: ${intento === 1 ? 'Reactivar la venta con empatía.' : 'Re-conectar suavemente, sin presionar.'}
+            ESTILO: Conversacional, cálido y argentino.
+            REGLAS: Solo el cuerpo del mensaje.
+        `;
+        try {
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim().replace(/^"|"$/g, '').replace(/^(Claro|Aquí|Te paso|Por supuesto).*?:/i, '').trim();
+        } catch (e) {
+            return `Hola ${nombreSaludo}, soy Milo de Labeltech. Quería ver si necesitaban reponer ${productos}.`;
+        }
+    }
+
+    // 2. Si HAY historial, usamos la RUTA HÍBRIDA (Milo resume, Gemini redacta)
+    const promptDatosMilo = `
+        Analiza este historial reciente de "${cliente}": ${JSON.stringify(memoria)}.
+        Resumen en 1 oración de qué se habló la última vez y si hubo algún problema o promesa.
+        Si no hay nada útil, responde "Sin novedades".
+    `;
+
+    const tareaEstrategicaGemini = `
+        Redacta un mensaje de WhatsApp para "${nombreSaludo}" de la empresa "${cliente}".
+        Contexto del sistema: Hace más de 60 días que no compra facturado.
+        Contexto de la charla: (Lee el resumen de Milo para saber de qué hablaron por última vez y adaptá tu mensaje a eso).
+        Producto habitual: ${productos}.
+        Objetivo: Reactivar la venta de forma natural. Si Milo menciona que el cliente estaba esperando algo, hace referencia a eso.
+        Estilo: Conversacional, cálido, rioplatense (argentino).
+        REGLAS: Solo el cuerpo del mensaje, listo para enviar.
     `;
 
     try {
-        const result = await model.generateContent(prompt);
-        let text = result.response.text().trim();
-        return text.replace(/^"|"$/g, '').replace(/^(Claro|Aquí|Te paso|Por supuesto).*?:/i, '').trim();
+        const mensajeFinal = await consultaHibrida(promptDatosMilo, tareaEstrategicaGemini);
+        return mensajeFinal.replace(/^"|"$/g, '').replace(/^(Claro|Aquí|Te paso|Por supuesto).*?:/i, '').trim();
     } catch (e) {
-        const variaciones = [
-            `Hola ${nombreSaludo}, soy Milo de Labeltech. Estaba revisando y vi que hace un tiempito no reponemos stock de ${productos}. ¿Cómo vienen con eso?`,
-            `¿Cómo estás ${nombreSaludo}? Milo de este lado. Te escribo porque hace bastante no preparamos pedido de ${productos} y quería ver si necesitaban asistencia.`
-        ];
-        return variaciones[Math.floor(Math.random() * variaciones.length)];
+        console.error("Error en generación híbrida:", e);
+        return `Hola ${nombreSaludo}, soy Milo de Labeltech. Estaba revisando y vi que hace un tiempito no reponemos stock de ${productos}. ¿Cómo vienen con eso?`;
     }
 }
+
+// --- SE MANTIENEN TODAS TUS FUNCIONES ORIGINALES ---
 
 async function generateBudgetFollowUp(cliente, numeroPresupuesto, montoStr) {
     const prompt = `
@@ -186,7 +225,7 @@ async function verificarSiSeConvirtioEnVenta(db, clienteId, fechaPresupuesto) {
 }
 
 async function runDailyAnalysis() {
-    console.log('--- 🧠 Milowsky Scheduler: Analizando Clientes Actuales ---');
+    console.log('--- 🧠 Milowsky Scheduler Híbrido: Analizando Clientes Actuales ---');
     const db = pool;
     let generatedCount = 0;
 
@@ -196,15 +235,16 @@ async function runDailyAnalysis() {
 
         // 1. RECUPERO INICIAL (CLIENTES ACTUALES)
         if (generatedCount < MAX_GENERATIONS_PER_RUN) {
+            // AÑADIDO: c.Mail a la consulta para pasárselo a Milo
             const [clientes] = await db.query(`
-                SELECT c.id, c.Empresa, c.Contacto, c.Telefono, MAX(AllSales.Fecha) as ultima_compra
+                SELECT c.id, c.Empresa, c.Contacto, c.Telefono, c.Mail, MAX(AllSales.Fecha) as ultima_compra
                 FROM Clientes c 
                 JOIN (
                     SELECT Cliente_id, Fecha, Total_ARS FROM Ventas WHERE Cliente_id IS NOT NULL
                     UNION ALL
                     SELECT Cliente_id, Fecha, Total_ARS FROM VentasX WHERE Cliente_id IS NOT NULL
                 ) AS AllSales ON c.id = AllSales.Cliente_id
-                GROUP BY c.id, c.Empresa, c.Contacto, c.Telefono
+                GROUP BY c.id, c.Empresa, c.Contacto, c.Telefono, c.Mail
                 HAVING ultima_compra < DATE_SUB(CURDATE(), INTERVAL 60 DAY)
                 ORDER BY SUM(AllSales.Total_ARS) DESC
             `); 
@@ -234,7 +274,8 @@ async function runDailyAnalysis() {
                 
                 const prod = prods[0]?.Descripcion || "insumos";
                 
-                const msg = await generateReconnectionMessage(c.Empresa, prod, c.Contacto, 1);
+                // AÑADIDO: Pasamos c.id y c.Mail para que el cerebro híbrido trabaje
+                const msg = await generateReconnectionMessage(c.Empresa, prod, c.Contacto, 1, c.id, c.Mail);
                 const dias = Math.floor((new Date() - new Date(c.ultima_compra)) / (1000 * 60 * 60 * 24));
 
                 await db.query(`INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`, [
@@ -288,7 +329,8 @@ async function runDailyAnalysis() {
                         const yaGeneradoIA = await checkRecentHistory(db, cid, 'RECONTACTO_2', 90);
                         if (yaHablaron || yaGeneradoIA) continue;
 
-                        const msg2 = await generateReconnectionMessage(parsed.data.nombre_cliente, "etiquetas", null, 2);
+                        // AÑADIDO: Pasamos cid para que lea el historial antes del 2do intento
+                        const msg2 = await generateReconnectionMessage(parsed.data.nombre_cliente, "etiquetas", null, 2, cid);
                         await db.query(`INSERT INTO IA_Insights (tipo, mensaje, datos_extra, estado) VALUES (?, ?, ?, ?)`, [
                             'RECONTACTO_2', `Segundo intento ${parsed.data.nombre_cliente}`,
                             JSON.stringify({
@@ -359,8 +401,6 @@ async function runDailyAnalysis() {
              }
         }
 
-        // --- SE ELIMINÓ EL MINERO DE AQUÍ PARA EVITAR SATURAR LA API ---
-
         if (generatedCount >= MAX_GENERATIONS_PER_RUN) {
             console.log('🛑 Límite de seguridad alcanzado (5 tareas).');
         }
@@ -374,7 +414,7 @@ async function runDailyAnalysis() {
 function initScheduler() {
     cron.schedule('0 * * * *', () => runDailyAnalysis());
     setTimeout(() => runDailyAnalysis(), 5000);
-    console.log('✅ Milo Server: Iniciado (Modo Optimizado - Clientes Reales)');
+    console.log('✅ Milo Server: Iniciado (Modo Híbrido Activo)');
 }
 
 module.exports = { initScheduler, runDailyAnalysis };

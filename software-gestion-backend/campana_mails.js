@@ -1,19 +1,13 @@
 // software-gestion-backend/campana_mails.js
 const cron = require('node-cron');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-require('dotenv').config();
 const dbMiddleware = require('./db');
 const pool = dbMiddleware.pool;
 const { enviarCorreoMilo } = require('./mailer');
 
-// 🔑 LLAVES: Prioridad a la dedicada, respaldo en las del minero
-const apiKeys = [
-    process.env.MAILER_GEMINI_KEY, // La nueva llave dedicada
-    process.env.MINER_API_KEY, 
-    process.env.MINER_API_KEY_2
-].filter(Boolean);
+// --- IMPORTAMOS EL CEREBRO HÍBRIDO Y LA MEMORIA ---
+const { consultaHibrida } = require('./milo_modules/hibrido');
+const { obtenerContextoCompleto } = require('./milo_modules/historial');
 
-let currentKeyIndex = 0;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function adaptarBaseDeDatos() {
@@ -22,41 +16,20 @@ async function adaptarBaseDeDatos() {
     } catch (e) {}
 }
 
-async function llamarIAConRotacion(prompt) {
-    let intentos = 0;
-    while (intentos < apiKeys.length) {
-        try {
-            const genAI = new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
-            const aiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-            const result = await aiModel.generateContent(prompt);
-            return result.response.text().trim();
-        } catch (error) {
-            if (error.message.includes('429') || error.message.includes('quota')) {
-                console.log(`   ⚠️ Llave ${currentKeyIndex + 1} agotada. Probando respaldo...`);
-                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-                intentos++;
-            } else {
-                throw error;
-            }
-        }
-    }
-    throw new Error('Todas las llaves están agotadas.');
-}
-
 async function ejecutarCampanaDiaria() {
     console.log(`\n======================================================`);
-    console.log(`🚀 Campaña de Mails - ${new Date().toLocaleString()}`);
+    console.log(`🎯 Campaña de Mails "Francotirador" - ${new Date().toLocaleString()}`);
     console.log(`======================================================`);
 
     try {
-        // 🎯 PRIORIDAD: 150 leads, primero los que NUNCA recibieron mail.
+        // Buscamos leads que no hayan recibido mail en los últimos 40 días
         const [leads] = await pool.query(`
-            SELECT id, nombre, email 
+            SELECT id, nombre, email, telefono 
             FROM Leads_Antiguos 
             WHERE email IS NOT NULL 
             AND (ultimo_contacto_mail IS NULL OR ultimo_contacto_mail < DATE_SUB(NOW(), INTERVAL 40 DAY))
             ORDER BY ultimo_contacto_mail IS NULL DESC, ultimo_contacto_mail ASC
-            LIMIT 150
+            LIMIT 50 -- Bajamos a 50 para que el análisis profundo no tarde horas
         `);
 
         if (leads.length === 0) {
@@ -64,58 +37,64 @@ async function ejecutarCampanaDiaria() {
             return;
         }
 
-        console.log(`🎯 Procesando bloque de ${leads.length} contactos...`);
-
-        const angulosVenta = [
-            "Corto y directo: presentate como Milo de Labeltech y preguntá si necesitan etiquetas o cintas.",
-            "Cálido y nostálgico: decile que sos Milo, saludalos cordialmente y ponete a disposición para sus próximas compras.",
-            "Enfocado en servicio: mencioná que Labeltech optimizó sus entregas y querés cotizarles stock.",
-            "Consultivo: preguntale cómo viene su producción y recordale que son fabricantes directos."
-        ];
+        console.log(`🎯 Procesando bloque de ${leads.length} contactos con Cerebro Híbrido...`);
 
         for (let i = 0; i < leads.length; i++) {
             const lead = leads[i];
-            const anguloElegido = angulosVenta[Math.floor(Math.random() * angulosVenta.length)];
+            console.log(`\n🔎 [${i+1}/${leads.length}] Investigando a: ${lead.nombre}...`);
 
-            console.log(`\n✍️  Redactando (Llave IA: ${currentKeyIndex + 1}) para: ${lead.nombre}`);
+            // 1. BUSCAMOS MEMORIA OMNICANAL (WhatsApp + Mails)
+            // Usamos un ID genérico (0) porque los leads antiguos a veces no están en la tabla Clientes,
+            // pero buscamos por su email o teléfono.
+            const memoria = await obtenerContextoCompleto(0, lead.email); 
 
-        const prompt = `
-                CONTEXTO: Tu nombre es Milo, ejecutivo de cuentas de Labeltech (Fábrica de etiquetas y Ribbons).
-                IMPORTANTE: Tu nombre de firma es simplemente "Milo". No incluyas la palabra "Sos" en tu nombre ni en tu saludo.
+            // 2. EL ESTRATEGA (Milo lee, Gemini redacta)
+            let promptDatosMilo = "No hay historial previo con este cliente.";
+            if (memoria.chats.length > 0 || memoria.mails.length > 0) {
+                promptDatosMilo = `
+                    Analiza este historial de (Mails y WhatsApp) del lead "${lead.nombre}": 
+                    ${JSON.stringify(memoria)}.
+                    Resumen en 1 oración: ¿Qué le interesaba o de qué se quejó la última vez?
+                `;
+            }
 
-                DESTINATARIO: "${lead.nombre}"
+            const tareaEstrategicaGemini = `
+                Tu nombre es Milo, ejecutivo de cuentas de Labeltech (Fábrica de etiquetas y Ribbons).
+                Escribí un mail en frío (pero cálido) para el lead "${lead.nombre}".
                 
-                INSTRUCCIONES DE LIMPIEZA:
-                1. Analizá el nombre del destinatario. Si contiene números de teléfono, códigos o frases como "Base Histórica", "Archivo" o "Ceyal", ELIMINÁ esa parte.
-                2. Si el nombre de la empresa queda como un número o no es claro, usá un saludo genérico (ej: "Estimados," o "Hola,").
-                3. REGLA DE ORO: BAJO NINGUNA CIRCUNSTANCIA menciones la palabra "Ceyal" o "Ceyal Etiquetas". Somos Labeltech.
-
-                ESTRATEGIA DE VENTA: ${anguloElegido}
+                HISTORIAL: (Lee el resumen de Milo. Si dice que no hay historial, ofreceles nuestro catálogo de etiquetas y ribbons. Si hay historial, mencioná sutilmente lo último que hablaron para conectar).
                 
-                FORMATO: Entregá ÚNICAMENTE un objeto JSON con las llaves "asunto" y "cuerpo". Sin formato markdown, solo el texto plano.
+                REGLAS DE FORMATO:
+                1. Eliminá números, "Base Histórica" o "Archivo" del nombre del cliente.
+                2. NUNCA menciones la palabra "Ceyal". Somos Labeltech.
+                3. Entregá ÚNICAMENTE un objeto JSON con las llaves "asunto" y "cuerpo". Sin markdown, solo texto.
             `;
 
             try {
-                let respuesta = await llamarIAConRotacion(prompt);
+                // LLAMADA AL MOTOR HÍBRIDO (RTX + Nube)
+                let respuesta = await consultaHibrida(promptDatosMilo, tareaEstrategicaGemini);
+                
+                // Limpiamos el JSON que devuelve Gemini
                 respuesta = respuesta.replace(/```json/g, '').replace(/```/g, '').trim();
                 const mailData = JSON.parse(respuesta);
 
+                // ENVIAMOS EL MAIL
                 const mailEnviado = await enviarCorreoMilo(lead.email, mailData.asunto, mailData.cuerpo);
 
                 if (mailEnviado) {
                     await pool.query(`UPDATE Leads_Antiguos SET ultimo_contacto_mail = NOW() WHERE id = ?`, [lead.id]);
-                    console.log(`   ✅ Enviado a ${lead.email}`);
+                    console.log(`   ✅ Mail súper-personalizado enviado a ${lead.email}`);
                 }
             } catch (error) {
-                console.log(`   ❌ Error:`, error.message);
+                console.log(`   ❌ Error con ${lead.nombre}:`, error.message);
             }
 
+            // Pausa de 20 segs para no saturar SMTP ni la GPU
             if (i < leads.length - 1) {
-                console.log(`   ⏳ Esperando 45 segundos...`);
-                await delay(45000); 
+                await delay(20000); 
             }
         }
-        console.log(`\n🏁 Bloque de hoy finalizado.`);
+        console.log(`\n🏁 Campaña Francotirador finalizada.`);
     } catch (error) {
         console.error("Error en campaña:", error);
     }
@@ -123,8 +102,9 @@ async function ejecutarCampanaDiaria() {
 
 async function iniciarMotor() {
     await adaptarBaseDeDatos();
-    cron.schedule('0 10 * * *', () => ejecutarCampanaDiaria());
-    console.log("✉️ Motor de Campañas: INICIADO.");
+    cron.schedule('0 10 * * *', () => ejecutarCampanaDiaria()); // Se ejecuta a las 10 AM
+    console.log("✉️ Motor de Campañas Francotirador: INICIADO.");
+    // Lo corremos a los 5 segundos de prender para probar
     setTimeout(() => ejecutarCampanaDiaria(), 5000);
 }
 

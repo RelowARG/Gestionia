@@ -13,10 +13,8 @@ import ListaCompras from './components/ListaCompras';
 import ListaStock from './components/ListaStock';
 import ListaPresupuestos from './components/ListaPresupuestos';
 import ListaVentasX from './components/ListaVentasX';
-// Importar ListaVentasGlobal y VentaEditor
 import ListaVentasGlobal from './components/ListaVentasGlobal';
 import VentaEditor from './components/ventas/VentaEditor';
-// Importar ListaVentasXGlobal y el nuevo VentaXEditor
 import ListaVentasXGlobal from './components/ListaVentasXGlobal';
 import VentaXEditor from './components/ventasx/VentaXEditor';
 import ListaComprasGlobal from './components/ListaComprasGlobal';
@@ -26,9 +24,9 @@ import Balance from './components/Balance';
 import Login from './components/Login';
 import ListaUsuarios from './components/ListaUsuarios';
 
-// --- NUEVO COMPONENTE IA ---
+// --- COMPONENTES DE IA ---
+import MiloDashboard from './components/MiloDashboard';
 import IAWidget from './components/IAWidget';
-// ---------------------------
 
 // Importar el archivo CSS
 import './styles.css';
@@ -73,13 +71,12 @@ function App() {
         localStorage.removeItem('currentUser');
     };
 
-     const ProtectedRoute = ({ children }) => {
-         if (!isAuthenticated) {
-             return <Navigate to="/login" replace />;
-         }
-         return children;
-     };
-
+    const ProtectedRoute = ({ children }) => {
+        if (!isAuthenticated) {
+            return <Navigate to="/login" replace />;
+        }
+        return children;
+    };
 
     return (
         <Router>
@@ -99,6 +96,9 @@ function App() {
                         <Route path="/stock" element={<ProtectedRoute><ListaStock /></ProtectedRoute>} />
                         <Route path="/presupuestos" element={<ProtectedRoute><ListaPresupuestos /></ProtectedRoute>} />
                         <Route path="/ventasx" element={<ProtectedRoute><ListaVentasX /></ProtectedRoute>} />
+
+                        {/* --- RUTA DE PANTALLA COMPLETA DE MILO --- */}
+                        <Route path="/milo" element={<ProtectedRoute><MiloDashboard /></ProtectedRoute>} />
 
                         <Route
                             path="/listados-ventas"
@@ -170,7 +170,7 @@ function App() {
                         <Route path="/estadisticas" element={<ProtectedRoute><Statistics /></ProtectedRoute>} />
                         <Route path="/usuarios" element={<ProtectedRoute><ListaUsuarios /></ProtectedRoute>} />
 
-                         {isAuthenticated && <Route path="/login" element={<Navigate to="/" replace />} />}
+                        {isAuthenticated && <Route path="/login" element={<Navigate to="/" replace />} />}
 
                     </Routes>
                 </div>

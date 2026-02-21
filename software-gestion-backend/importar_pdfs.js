@@ -22,7 +22,7 @@ async function llamarIAConRotacion(prompt, pdfPart) {
     while (intentos < apiKeys.length) {
         try {
             const genAI = new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
-            const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Usamos flash para minería masiva
+            const aiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Usamos gemini 2.5 flash para minería masiva
             const result = await aiModel.generateContent([prompt, pdfPart]);
             return result.response.text().trim();
         } catch (error) {
