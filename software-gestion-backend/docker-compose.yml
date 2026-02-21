@@ -1,0 +1,84 @@
+services:
+  backend-server:
+    build: .
+    container_name: gestionia-backend-server
+    restart: always
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node server.js
+
+  detector-fuga:
+    build: .
+    container_name: gestionia-detector-fuga
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node detector_fuga.js
+
+  campana-mails:
+    build: .
+    container_name: gestionia-campana-mails
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node campana_mails.js
+
+  # AHORA SÍ: El Minero de Mails original
+  minero-mails:
+    build: .
+    container_name: gestionia-minero-mails
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node minero_mails.js
+
+  # EL NUEVO: El Minero de PDFs
+  minero-pdfs:
+    build: .
+    container_name: gestionia-minero-pdfs
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node importar_pdfs.js
+
+  recepcionista-mails:
+    build: .
+    container_name: gestionia-recepcionista-mails
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node recepcionista_mails.js
+
+  yuki-server:
+    build: 
+      context: E:/yuki-studio 
+      dockerfile: Dockerfile
+    container_name: yuki-server
+    restart: always
+    ports:
+      - "4000:4000" 
+    volumes:
+      - E:/yuki-studio:/app
+      - E:/Gestionia:/gestionia
+      - /app/node_modules
+    command: node yuki_server.js

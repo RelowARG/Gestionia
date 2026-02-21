@@ -9,7 +9,18 @@ const { model } = require('../ai_modules/core');
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: { args: ['--no-sandbox'] }
+    puppeteer: { 
+        // Argumentos OBLIGATORIOS para que Chromium funcione correctamente dentro de Docker Linux
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // Previene crashes por falta de memoria compartida en Docker
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+        ] 
+    }
 });
 
 client.on('qr', (qr) => {

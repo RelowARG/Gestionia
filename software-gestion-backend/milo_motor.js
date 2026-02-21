@@ -1,10 +1,10 @@
 // E:\Gestionia\software-gestion-backend\milo_motor.js
 const axios = require('axios');
 
-// 🧠 TUS DOS CEREBROS CONECTADOS
+// 🧠 TUS DOS CEREBROS CONECTADOS (Ajustado para Docker)
 const SERVIDORES_MILO = [
-    'http://127.0.0.1:11434/api/generate',      // Servidor 1: PC Principal (RTX 3080)
-    'http://192.168.1.34:11434/api/generate'    // Servidor 2: PC Secundaria (RTX 3070)
+    'http://host.docker.internal:11434/api/generate', // Servidor 1: PC Principal (RTX 3080)
+    'http://192.168.1.34:11434/api/generate'          // Servidor 2: PC Secundaria (RTX 3070)
 ];
 
 // Variable para recordar a qué PC le toca trabajar

@@ -7,6 +7,7 @@ const dbMiddleware = require('./db');
 const pool = dbMiddleware.pool;
 
 const carpetaPDFs = path.join(__dirname, 'presupuestos_viejos');
+const archivoEstado = path.join(carpetaPDFs, 'procesados.json'); // NUEVO: Memoria del Minero
 const apiKeys = [process.env.MINER_API_KEY, process.env.MINER_API_KEY_2].filter(Boolean);
 let currentKeyIndex = 0;
 
@@ -38,14 +39,24 @@ async function llamarIAConRotacion(prompt, pdfPart) {
 
 async function procesarDirectorio() {
     console.log("🚀 Iniciando Minería Lenta (Modo Anti-Bloqueo)...");
-    const archivos = fs.readdirSync(carpetaPDFs).filter(file => file.endsWith('.pdf'));
     
+    // 1. Leer progreso anterior
+    let procesados = [];
+    if (fs.existsSync(archivoEstado)) {
+        procesados = JSON.parse(fs.readFileSync(archivoEstado, 'utf-8'));
+    }
+
+    const todosLosArchivos = fs.readdirSync(carpetaPDFs).filter(file => file.endsWith('.pdf'));
+    
+    // 2. Filtrar los que ya hicimos
+    const archivos = todosLosArchivos.filter(file => !procesados.includes(file));
+
     if (archivos.length === 0) {
-        console.log("⚠️ No hay PDFs.");
+        console.log("⚠️ No hay PDFs nuevos por procesar. Todos están listos.");
         process.exit();
     }
 
-    console.log(`🔍 Se encontraron ${archivos.length} PDFs. Procesando 1 cada 15 minutos.`);
+    console.log(`🔍 Se encontraron ${archivos.length} PDFs pendientes de un total de ${todosLosArchivos.length}. Procesando 1 cada 15 minutos.`);
 
     for (let i = 0; i < archivos.length; i++) {
         const archivo = archivos[i];
@@ -65,7 +76,11 @@ async function procesarDirectorio() {
             // ... (Toda la lógica de guardado en la DB se mantiene igual)
             // [AQUÍ VA TU LÓGICA DE VALIDAR TELÉFONO E INSERTAR EN LEADS_ANTIGUOS]
             
-            console.log(`   ✅ Guardado con éxito.`);
+            // NUEVO: Guardamos este PDF en la memoria para no volver a leerlo nunca
+            procesados.push(archivo);
+            fs.writeFileSync(archivoEstado, JSON.stringify(procesados, null, 2));
+            
+            console.log(`   ✅ Guardado con éxito. Progreso registrado.`);
 
         } catch (error) {
             console.error(`   ❌ Error en ${archivo}:`, error.message);
