@@ -5,6 +5,15 @@ const path = require('path');
 module.exports = {
   packagerConfig: {
     asar: true,
+    // 🔥 EL ESCUDO PROTECTOR: Ignoramos el backend, la IA y cachés gigantes
+    ignore: [
+      /\/software-gestion-backend/,
+      /\/\.wwebjs_auth/,
+      /\/\.wwebjs_cache/,
+      /\/yuki-studio/,
+      /\/out/,
+      /\/make/
+    ]
   },
   rebuildConfig: {},
   makers: [
@@ -26,12 +35,6 @@ module.exports = {
     },
   ],
   plugins: [
-    // {
-    //   name: '@electron-forge/plugin-auto-unpack-natives',
-    //   config: {},
-    // },
-    // Fuses are used to enable/disable various Electron functionality
-    // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,

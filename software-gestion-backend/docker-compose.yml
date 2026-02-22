@@ -82,3 +82,37 @@ services:
       - E:/Gestionia:/gestionia
       - /app/node_modules
     command: node yuki_server.js
+
+    # 🗄️ LA BASE DE DATOS DOCKERIZADA
+  mysql-db:
+    image: mysql:8.0
+    container_name: gestionia-mysql
+    restart: always
+    command: --lower_case_table_names=1
+    environment:
+      MYSQL_ROOT_PASSWORD: Milo200723!
+      MYSQL_DATABASE: software_gestion_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+
+  # 🛡️ EL SISTEMA DE AUTOBACKUPS
+  auto-backup:
+    image: fradelg/mysql-cron-backup
+    container_name: gestionia-autobackup
+    restart: always
+    depends_on:
+      - mysql-db
+    environment:
+      MYSQL_HOST: mysql-db
+      MYSQL_USER: root
+      MYSQL_PASS: Milo200723!
+      CRON_TIME: "0 3 * * *"
+      MAX_BACKUPS: 7
+      INIT_BACKUP: "1"
+    volumes:
+      - ./backups:/backup
+volumes:
+  db_data:
